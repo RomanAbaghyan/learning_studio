@@ -13,11 +13,11 @@ development: `make dev` (or `.venv/bin/python app.py`).
 | Variable | `python app.py` default | Docker on a server | Meaning |
 |----------|-------------------------|--------------------|---------|
 | `PORT` | `8735` | `8735` | Listen port |
-| `ACADEMY_HOST` | `0.0.0.0` | `0.0.0.0` inside the container, published on the host's `127.0.0.1` only | Bind address. Nothing but the proxy may reach the app; see §3 |
+| `ACADEMY_HOST` | `127.0.0.1` | `0.0.0.0` inside the container, published on the host's `127.0.0.1` only | Bind address. Nothing but the proxy may reach the app; see §3 |
 | `ACADEMY_DB` | `./1991_academy.db` | `/data/academy.db`, in the `academy_data` volume | SQLite path |
 | `ACADEMY_DEBUG` | `1` | `0` | `0` enables asset caching and hides the API docs |
 | `ACADEMY_CPP_RUNNER` | unset | `/run/cpp/runner.sock` | The C++ runner container's socket. When set, learners' C++ is compiled and run there, never in the app (§2) |
-| `ACADEMY_CPP` | `1` | `0` | Without a runner, `1` compiles learner C++ inside the app process: a convenience for development on your own computer, not a sandbox. **Never `1` on a public server.** (The app image has no compiler, so it couldn't anyway) |
+| `ACADEMY_CPP` | `0` | `0` | Without a runner, `1` compiles learner C++ inside the app process: a convenience for development on your own computer, not a sandbox. **Never `1` on a public server.** (The app image has no compiler, so it couldn't anyway) |
 | `ACADEMY_SECURE_COOKIES` | on unless `ACADEMY_DEBUG=1` | on | Marks the session cookie `Secure` (HTTPS only) and sends HSTS |
 | `ACADEMY_TRUST_PROXY` | `0` | `1` | **`1` when, and only when, a trusted reverse proxy sets `X-Forwarded-For`.** See §3 |
 | `ACADEMY_BASE_URL` | `http://localhost:8735` | `https://$DOMAIN` | Public origin used to build password-reset links |

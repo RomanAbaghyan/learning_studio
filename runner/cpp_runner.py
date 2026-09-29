@@ -42,6 +42,7 @@ import sys
 import tempfile
 import traceback
 import queue
+import threading
 
 CXX = os.environ.get("CPP_COMPILER") or shutil.which("g++") or shutil.which("c++") or shutil.which("clang++")
 SOCKET_PATH = os.environ.get("CPP_RUNNER_SOCKET", "/run/cpp/runner.sock")
@@ -216,7 +217,7 @@ def _cleanup_as(uid, job):
          "try:\n    os.kill(-1, signal.SIGKILL)\nexcept ProcessLookupError:\n    pass\n"
          "shutil.rmtree(sys.argv[1], ignore_errors=True)\n", job],
         user=uid, group=uid, extra_groups=[], cwd="/", env={"PATH": "/usr/bin:/bin"},
-        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20, check=True)
 
 
 def run_sandboxed(source):
@@ -225,26 +226,38 @@ def run_sandboxed(source):
     except queue.Empty:
         return {"error": "busy"}
     uid = BASE_UID + slot
-    job = tempfile.mkdtemp(dir=WORK, prefix="job-")
-    io_dir = tempfile.mkdtemp(dir=os.path.join(WORK, ".io"))
+    job = io_dir = None
     try:
+        job = tempfile.mkdtemp(dir=WORK, prefix="job-")
+        io_dir = tempfile.mkdtemp(dir=os.path.join(WORK, ".io"))
         return _compile_and_run(source, job=job, io_dir=io_dir, uid=uid, strict=True)
     finally:
+        reusable = False
         try:
-            _cleanup_as(uid, job)
+            if job is not None:
+                _cleanup_as(uid, job)
+                # If allocation failed before ownership changed, remove the
+                # still-root-owned empty directory as well.
+                shutil.rmtree(job, ignore_errors=True)
+            reusable = True
         finally:
-            shutil.rmtree(io_dir, ignore_errors=True)
-            _slots.put(slot)
+            if io_dir is not None:
+                shutil.rmtree(io_dir, ignore_errors=True)
+            if reusable:
+                _slots.put(slot)
 
 
 class _Handler(socketserver.StreamRequestHandler):
     def handle(self):
         try:
+            self.connection.settimeout(10)
             line = self.rfile.readline(MAX_REQUEST + 1)
+            if len(line) > MAX_REQUEST:
+                raise ValueError("request too large")
             request = json.loads(line)
             if request.get("ping"):
                 reply = {"ok": True, "compiler": bool(CXX)}
-            elif isinstance(request.get("source"), str) and len(request["source"]) <= MAX_SOURCE:
+            elif isinstance(request.get("source"), str) and len(request["source"].encode("utf-8")) <= MAX_SOURCE:
                 reply = run_sandboxed(request["source"])
             else:
                 reply = {"error": "bad_request"}
@@ -258,6 +271,30 @@ class _Handler(socketserver.StreamRequestHandler):
 
 class _Server(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
     daemon_threads = True
+
+    def __init__(self, *args, **kwargs):
+        self.handlers = threading.BoundedSemaphore(SLOTS + 8)
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request, client_address):
+        if not self.handlers.acquire(blocking=False):
+            try:
+                request.settimeout(1)
+                request.sendall(b'{"error":"busy"}\n')
+            finally:
+                self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self.handlers.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.handlers.release()
 
 
 def serve():

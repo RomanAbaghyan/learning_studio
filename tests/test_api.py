@@ -562,3 +562,73 @@ def test_cpp_runs_locally_with_output_and_line_numbers(client, monkeypatch):
                                             "harness": 'int main() { __check("given type", get({7}), 7); }'}).json()
     assert out["results"] == [{"name": "given type", "pass": True, "expected": "7", "actual": "7"}]
 
+
+
+@pytest.mark.parametrize("payload", [[], [1], "text", 12, True, None])
+@pytest.mark.parametrize("path", ["register", "login", "state", "change-password", "forgot-password", "reset-password", "delete-account", "leaderboard-optin"])
+def test_json_object_required(client, payload, path):
+    method = client.put if path == "state" else client.post
+    assert method("/api/" + path, content=json.dumps(payload), headers={"Content-Type": "application/json"}).status_code == 400
+
+
+def test_invalid_field_types(client):
+    assert register(client, password=12345678).status_code == 400
+    register(client)
+    assert client.post("/api/leaderboard-optin", json={"optIn": "false"}).status_code == 400
+
+
+def test_cross_origin_mutations_rejected(client):
+    assert client.post("/api/register", headers={"Origin": "https://untrusted.example"}, json={}).status_code == 403
+    assert client.post("/api/logout", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    assert client.post("/api/logout", headers={"Origin": "http://testserver"}).status_code == 200
+
+
+def test_streamed_body_limit(client):
+    chunks = (b"x" * 100_000 for _ in range(4))
+    assert client.put("/api/state", content=chunks).status_code == 413
+
+
+def test_state_revision_conflict_preserves_winner(client):
+    register(client)
+    initial = client.put("/api/state", json={"data": {"draft": "first"}, "expectedUpdated": None, "owner": "alice"}).json()
+    revision = initial["updated"]
+    assert client.put("/api/state", json={"data": {"draft": "second"}, "expectedUpdated": revision}).status_code == 200
+    assert client.put("/api/state", json={"data": {"draft": "stale"}, "expectedUpdated": revision}).status_code == 409
+    assert client.get("/api/state").json()["data"] == {"draft": "second"}
+    assert client.put("/api/state", json={"data": {}, "owner": "bob"}).status_code == 409
+
+
+def test_change_password_invalidates_reset_links(client):
+    register(client)
+    token = app._forgot_password("alice@example.com").split("reset=")[1]
+    assert client.post("/api/change-password", json={"currentPassword": "hunter2pw", "newPassword": "newpassword"}).status_code == 200
+    assert app._reset_password(token, "oldlinkpassword") is None
+
+
+def test_concurrent_reset_is_single_use(client):
+    from concurrent.futures import ThreadPoolExecutor
+    register(client)
+    token = app._forgot_password("alice@example.com").split("reset=")[1]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: app._reset_password(token, "newpassword"), range(2)))
+    assert sum(result is not None for result in results) == 1
+
+
+def test_surrogate_json_does_not_crash_password_hashing(client):
+    body = json.dumps({'username': 'alice', 'email': 'alice@example.com', 'password': 'password\ud800'})
+    assert client.post('/api/register', content=body, headers={'Content-Type': 'application/json'}).status_code == 400
+
+
+def test_production_does_not_log_reset_token(client, monkeypatch, caplog):
+    monkeypatch.setattr(app, 'DEBUG', False)
+    monkeypatch.setattr(app, 'SMTP_HOST', None)
+    app.send_email('alice@example.com', 'Reset', 'secret-reset-token')
+    assert 'secret-reset-token' not in caplog.text
+
+
+def test_rate_limiter_bounds_active_buckets(client, monkeypatch):
+    monkeypatch.setattr(app, '_BUCKET_CAP', 2)
+    monkeypatch.setattr(app, 'TRUST_PROXY', True)
+    for ip in ['10.0.0.1', '10.0.0.2', '10.0.0.3']:
+        client.post('/api/login', headers={'X-Forwarded-For': ip}, json={})
+    assert len(app._BUCKETS) == 2

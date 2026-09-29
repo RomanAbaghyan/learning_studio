@@ -57,8 +57,7 @@ const Runner = (() => {
      ============================================================ */
 
   /* Runs the learner's code, then the tests (or the visualizer's compute
-     function). The worker gets this function's source text, and where workers
-     are blocked it runs inline — so it must stay self-contained: no closures
+     function). The worker gets this function's source text, so it must stay self-contained: no closures
      over anything outside it. console.log & co. are captured for the output
      panel; errors carry the learner's own line number when the engine reports
      one (new Function puts two header lines above the body). */
@@ -142,10 +141,7 @@ const Runner = (() => {
       try {
         worker = spawnWorker(JS_WORKER_SRC);
       } catch {
-        /* file:// (and any context that blocks blob: workers) has no Worker, so
-           the code runs inline. No timeout protection there — it is a fallback,
-           not a supported mode; the account page tells people to run the server. */
-        resolve(academyRunJS(message));
+        resolve({ results: [], output: "", error: { type: "Error", message: "Code execution requires Web Workers. Open the site through the local server or a supported browser." } });
         return;
       }
 

@@ -35,3 +35,4 @@ runner/
 # Caddyfile from the host)
 deploy/
 !deploy/backup.sh
+!deploy/restore.py

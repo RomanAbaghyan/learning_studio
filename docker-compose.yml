@@ -61,7 +61,8 @@ services:
     security_opt:
       - no-new-privileges:true
     depends_on:
-      - runner
+      runner:
+        condition: service_healthy
     logging: *logging
 
   # Learners' C++ runs here, one program per throwaway user, never as root

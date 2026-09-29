@@ -21,14 +21,13 @@ Design notes that matter if you touch this file:
 
 Environment:
     PORT           listen port                      (default 8735)
-    ACADEMY_HOST   bind address                     (default 0.0.0.0 — reachable on
-                   your LAN; in Docker, compose publishes it on 127.0.0.1 only)
+    ACADEMY_HOST   bind address                     (default 127.0.0.1; in Docker, compose publishes it on 127.0.0.1 only)
     ACADEMY_DB     SQLite path                      (default ./1991_academy.db)
     ACADEMY_DEBUG  1 = dev mode: no-store caching   (default 1)
     ACADEMY_CPP_RUNNER  socket of the C++ runner container; Docker sets it
                    (docker-compose.yml), and C++ then runs there, sandboxed
     ACADEMY_CPP    1 = without a runner, compile learner C++ in-process
-                   (default 1, for development on your own computer; the
+                   (default 0; opt in only on your own computer; the
                    Docker image sets 0. Never 1 on a public server)
     ACADEMY_SECURE_COOKIES  1 = Secure (HTTPS-only) session cookie
                    (default: on unless ACADEMY_DEBUG=1)
@@ -94,10 +93,10 @@ PORT = int(os.environ.get("PORT", 8735))
 # directly could forge X-Forwarded-For and walk around the per-IP rate limits.
 # In Docker the container binds 0.0.0.0 and docker-compose.yml publishes the
 # port on 127.0.0.1 only, so just Caddy and the host itself can reach it.
-HOST = os.environ.get("ACADEMY_HOST", "0.0.0.0")
+HOST = os.environ.get("ACADEMY_HOST", "127.0.0.1")
 DB_PATH = os.environ.get("ACADEMY_DB", str(ROOT / "1991_academy.db"))
 DEBUG = os.environ.get("ACADEMY_DEBUG", "1") == "1"
-ENABLE_CPP = os.environ.get("ACADEMY_CPP", "1") == "1"
+ENABLE_CPP = os.environ.get("ACADEMY_CPP", "0") == "1"
 
 # Mark the session cookie Secure (HTTPS-only) in production. Defaults to the
 # opposite of DEBUG so local http://localhost dev still works, prod does not
@@ -394,7 +393,10 @@ def send_email(to: str, subject: str, body: str) -> bool:
     """Send a plaintext email. If SMTP isn't configured, log the body instead
     (so local dev / reset links stay testable) and report False."""
     if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
-        log.warning("SMTP not configured — email to %s NOT sent. Contents:\n%s", to, body)
+        if DEBUG:
+            log.warning("SMTP not configured — email to %s NOT sent. Contents:\n%s", to, body)
+        else:
+            log.warning("SMTP not configured — reset email NOT sent")
         return False
     msg = EmailMessage()
     msg["From"] = SMTP_FROM
@@ -479,8 +481,15 @@ async def json_body(request: Request):
         body = await request.body()
         if len(body) > MAX_BODY:
             return None
-        return json.loads(body)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+        data = json.loads(body)
+        json.dumps(data, ensure_ascii=False).encode("utf-8")
+        if not isinstance(data, dict):
+            return None
+        for field in ("username", "email", "password", "identifier", "currentPassword", "newPassword", "token"):
+            if field in data and not isinstance(data[field], str):
+                return None
+        return data
+    except (ValueError, UnicodeError, RecursionError):
         return None
 
 # --------------------------------------------------------------- rate limit
@@ -507,9 +516,11 @@ def rate_limited(request: Request, bucket: str, limit: int, window_s: int) -> bo
     now = time.time()
     # The dict grew one entry per distinct IP forever; drop idle ones when it
     # gets large rather than letting a long-lived process leak them.
-    if len(_BUCKETS) > _BUCKET_CAP:
+    if len(_BUCKETS) >= _BUCKET_CAP:
         for k in [k for k, dq in _BUCKETS.items() if not dq or dq[-1] < now - 3600]:
             del _BUCKETS[k]
+    if key not in _BUCKETS and len(_BUCKETS) >= _BUCKET_CAP:
+        return True
     dq = _BUCKETS[key]
     while dq and dq[0] < now - window_s:
         dq.popleft()
@@ -598,6 +609,30 @@ async def guard(request: Request, call_next):
     if cl and cl.isdigit() and int(cl) > MAX_BODY:
         return err("Request too large.", 413)
 
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        # Check browser origins even for text/plain requests: JSON parsing alone
+        # does not prevent cross-site form submissions or same-site sibling attacks.
+        origin = request.headers.get("origin")
+        if request.headers.get("sec-fetch-site") == "cross-site" or (
+            origin and origin not in (str(request.base_url).rstrip("/"), BASE_URL)
+        ):
+            return err("Cross-origin request denied.", 403)
+        # Bound actual bytes, including chunked requests without Content-Length.
+        chunks, size = [], 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > MAX_BODY:
+                return err("Request too large.", 413)
+            chunks.append(chunk)
+        request._body = b"".join(chunks)
+
+    if path == "/api/dsa/tutor" and request.method == "POST":
+        if rate_limited(request, "dsa-tutor", 12, 60):
+            return err("Too many tutor requests — wait a minute.", 429)
+        if os.environ.get("ACADEMY_TUTOR_URL") and os.environ.get("ACADEMY_TUTOR_MODEL"):
+            if await run_in_threadpool(_me, session_token(request)) is None:
+                return err("Sign in to use the configured AI tutor.", 401)
+
     t0 = time.time()
     response = await call_next(request)
     ms = int((time.time() - t0) * 1000)
@@ -676,6 +711,8 @@ async def api_register(request: Request):
 
 def _login(identifier: str, password: str):
     with db() as conn:
+        # Session issuance must not race password rotation or account deletion.
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
             "SELECT * FROM users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE",
             (identifier, identifier),
@@ -751,11 +788,11 @@ def _get_state(token):
             "SELECT data, updated FROM state WHERE user_id = ?", (user["id"],)
         ).fetchone()
     if row is None:
-        return {"data": None, "updated": None}
+        return {"data": None, "updated": None, "owner": user["username"]}
     data = json.loads(row["data"])
     if isinstance(data, dict):
         data = current_keys(data)
-    return {"data": data, "updated": row["updated"]}
+    return {"data": data, "updated": row["updated"], "owner": user["username"]}
 
 
 @app.get("/api/state")
@@ -795,15 +832,23 @@ def xp_snapshot(data: dict):
     return min(total, MAX_XP)
 
 
-def _put_state(token, data: dict):
+def _put_state(token, data: dict, expected_updated=..., owner=None):
     with db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         user = current_user(token, conn)
         if user is None:
             return False
+        if owner is not None and owner != user["username"]:
+            return "owner-mismatch"
+        previous = conn.execute("SELECT updated FROM state WHERE user_id = ?", (user["id"],)).fetchone()
+        previous_updated = previous["updated"] if previous else None
+        if expected_updated is not ... and expected_updated != previous_updated:
+            return "conflict"
+        updated = max(time.time(), (previous_updated or 0) + 0.000001)
         conn.execute(
             "INSERT INTO state (user_id, data, updated) VALUES (?, ?, ?) "
             "ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated = excluded.updated",
-            (user["id"], json.dumps(data), time.time()),
+            (user["id"], json.dumps(data), updated),
         )
         xp_total = xp_snapshot(data)
         if xp_total is not None:
@@ -817,7 +862,7 @@ def _put_state(token, data: dict):
                 (xp_total, time.time(), week_start, wk, user["id"]),
             )
         conn.commit()
-    return True
+    return {"ok": True, "updated": updated}
 
 
 @app.put("/api/state")
@@ -833,10 +878,19 @@ async def api_put_state(request: Request):
     if not all(isinstance(k, str) and isinstance(v, str) for k, v in data.items()):
         return err("invalid request body")
     data = current_keys(data)  # from a page loaded before the storage-prefix rename
-    ok = await run_in_threadpool(_put_state, session_token(request), data)
+    expected = body.get("expectedUpdated", ...)
+    if expected is not ... and expected is not None and (
+        isinstance(expected, bool) or not isinstance(expected, (int, float)) or (isinstance(expected, float) and not math.isfinite(expected))
+    ):
+        return err("invalid revision")
+    ok = await run_in_threadpool(_put_state, session_token(request), data, expected, body.get("owner"))
+    if ok == "owner-mismatch":
+        return err("Account changed. Sign in again before syncing.", 409)
+    if ok == "conflict":
+        return err("Progress changed on another device. Local progress has been preserved.", 409)
     if not ok:
         return err("not signed in", 401)
-    return {"ok": True}
+    return ok
 
 # ---------------------------------------------------------------- leaderboard
 
@@ -906,7 +960,9 @@ async def api_leaderboard_optin(request: Request):
     body = await json_body(request)
     if body is None:
         return err("invalid request body")
-    opt_in = 1 if body.get("optIn") else 0
+    if not isinstance(body.get("optIn"), bool):
+        return err("optIn must be a boolean")
+    opt_in = int(body["optIn"])
     username = await run_in_threadpool(_leaderboard_optin, session_token(request), opt_in)
     if username is None:
         return err("not signed in", 401)
@@ -918,6 +974,7 @@ async def api_leaderboard_optin(request: Request):
 
 def _change_password(token, current: str, new: str):
     with db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         user = current_user(token, conn)
         if user is None:
             return "unauthorized"
@@ -928,6 +985,7 @@ def _change_password(token, current: str, new: str):
             "UPDATE users SET pass_hash = ?, salt = ? WHERE id = ?",
             (hash_password(new, salt), salt.hex(), user["id"]),
         )
+        conn.execute("DELETE FROM password_resets WHERE user_id = ?", (user["id"],))
         # keep the caller signed in, drop every OTHER session (a changed password
         # should log out other devices).
         conn.execute(
@@ -939,6 +997,8 @@ def _change_password(token, current: str, new: str):
 
 @app.post("/api/change-password")
 async def api_change_password(request: Request):
+    if rate_limited(request, "account-password", 10, 60):
+        return err("Too many attempts — wait a minute.", 429)
     body = await json_body(request)
     if body is None:
         return err("invalid request body")
@@ -1006,6 +1066,7 @@ async def api_forgot_password(request: Request):
 def _reset_password(token: str, new: str):
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     with db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
             "SELECT * FROM password_resets WHERE token_hash = ?", (token_hash,)
         ).fetchone()
@@ -1042,6 +1103,7 @@ async def api_reset_password(request: Request):
 
 def _delete_account(token, password: str):
     with db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         user = current_user(token, conn)
         if user is None:
             return "unauthorized"
@@ -1059,6 +1121,8 @@ def _delete_account(token, password: str):
 
 @app.post("/api/delete-account")
 async def api_delete_account(request: Request):
+    if rate_limited(request, "account-password", 10, 60):
+        return err("Too many attempts — wait a minute.", 429)
     body = await json_body(request)
     if body is None:
         return err("invalid request body")
@@ -1246,7 +1310,7 @@ async def api_run_cpp(request: Request):
             or not isinstance(body.get("prelude", ""), str):
         return err("invalid request body")
     source, harness, prelude = body["source"], body["harness"], body.get("prelude", "")
-    if max(len(source), len(harness), len(prelude)) > MAX_CODE_BYTES:
+    if max(len(part.encode("utf-8")) for part in (source, harness, prelude)) > MAX_CODE_BYTES:
         return JSONResponse({"results": [], "output": "", "error": {"kind": "too_large"}})
 
     raw = await run_in_threadpool(_run_cpp_program, build_cpp_program(source, harness, prelude))
@@ -1273,6 +1337,10 @@ async def api_health():
 
 # static site LAST so /api/* wins (the guard middleware has already restricted
 # which paths can reach it)
+from dsa_api import build_dsa_router
+
+app.include_router(build_dsa_router())
+
 app.mount("/", StaticFiles(directory=str(ROOT), html=True), name="site")
 
 

@@ -54,12 +54,14 @@ frontend server, build step or database server.
 
 ```bash
 make install   # once: creates .venv with the pinned dependencies
-make dev       # → http://localhost:8735   (accounts, sync, leaderboard, C++ runner)
+make dev       # → http://localhost:8735   (accounts, sync, leaderboard)
 ```
 
 `make` on its own lists every command. Without make, that's
 `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -c requirements.lock`,
 then `.venv/bin/python app.py`.
+
+Direct startup binds to localhost. Use Docker for the isolated C++ runner; `ACADEMY_CPP=1 make dev` explicitly enables host execution for trusted local code.
 
 Running it as a server, on your Mac or on the internet with HTTPS: see
 [Run with Docker](#run-with-docker).
@@ -81,7 +83,7 @@ Signed in, the account page also offers **change password**, **forgot/reset
 password** (emailed link) and **delete account** (GDPR-clean cascade). Password
 reset needs SMTP — set `ACADEMY_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` /
 `_FROM` and `ACADEMY_BASE_URL` (the origin used to build the reset link). With
-SMTP unset the reset link is **logged, not sent** (fine for local dev). The
+SMTP unset the reset link is logged only in debug mode and is not sent. Production logs never include reset links. The
 leaderboard has **This week / All time** tabs — the weekly league resets every
 ISO week (server rebases each user's weekly baseline on their first sync of a
 new week).
@@ -306,7 +308,7 @@ must all be contained.
 ## How it works
 
 - **Content is data.** Each `js/data/*.js` file registers a track object (modules → lessons → exercises → quiz questions) on `window.ACADEMY_1991`. Pages are thin shells that render from it.
-- **State is local-first.** Progress (`1991_academy:progress:v1`), XP/badges (`1991_academy:xp:v1`), review cards (`1991_academy:review:v1`), the language choice (`1991_academy:lang`) and code drafts (`1991_academy:draft:*`) live in localStorage. Signed in, the same keys are pushed to `/api/state` ~1.5 s after every change (coalesced into one request, and flushed on `pagehide`) and pulled back on any device you sign in on. Conflict rule: the copy with more XP wins; signing in as a *different* user on a shared device always adopts that account's server copy. The theme and per-problem editor language stay device-local on purpose. (The prefix was `martinium:` before the project was renamed. `js/common.js` moves a returning visitor's old keys over once on page load, and the server renames old keys in stored and incoming blobs.)
+- **State is local-first.** Progress (`1991_academy:progress:v1`), XP/badges (`1991_academy:xp:v1`), review cards (`1991_academy:review:v1`), the language choice (`1991_academy:lang`) and code drafts (`1991_academy:draft:*`) live in localStorage. Signed in, the same keys are pushed to `/api/state` ~1.5 s after every change (coalesced into one request, and flushed on `pagehide`) and pulled back on any device you sign in on. Writes carry the last server revision; stale writes are rejected. A saved baseline detects which copy changed, and when both changed the Account page asks which copy to keep; signing in as a *different* user on a shared device always adopts that account's server copy. The theme and per-problem editor language stay device-local on purpose. (The prefix was `martinium:` before the project was renamed. `js/common.js` moves a returning visitor's old keys over once on page load, and the server renames old keys in stored and incoming blobs.)
 - **State changes are announced, not reloaded.** `Progress`/`XP`/`Review` cache their parsed blob, so a render pass parses it once instead of forty times. Anything that rewrites those keys from outside — a sync pull, or another tab — calls `notifyStateChanged()` (`js/common.js`), which drops the caches and fires `1991_academy:state-changed`; page controllers subscribe with `onStateChanged(render)` and redraw in place. Open editors and in-progress practice sessions are deliberately left alone. Only a language change still forces a reload, because the language is baked into every rendered string.
 - **If a sync fails, you are told once.** Oversized payloads shed the largest code drafts first so progress always gets through; a 401 signs you out cleanly; repeated failures toast once, not every 1.5 seconds.
 - **Auth is boring on purpose.** Passwords are scrypt-hashed with per-user salts; sessions are random tokens in an HttpOnly cookie (30 days); users, sessions and state blobs live in `1991_academy.db` (SQLite). The FastAPI backend adds rate limiting (login/register/reset/C++ runner), request-size caps, structured logging, `/api/health` and env-based config — see `DEPLOYMENT.md` before exposing it to the open internet (HTTPS required; set `ACADEMY_CPP=0` publicly). Change-password and password-reset rotate the hash and invalidate sessions; reset tokens are SHA-256-hashed, single-use and expire in 1 hour; `forgot-password` always returns the same response (no email enumeration). Expired sessions and reset tokens are swept at startup and hourly.
@@ -316,7 +318,7 @@ must all be contained.
 - **Images are lean by design.** The logo and every favicon are inline SVG; the only raster images the UI renders are YouTube thumbnails, served `loading="lazy" decoding="async"` with intrinsic dimensions inside an `aspect-ratio` box (no layout shift), and the players are click-to-play `youtube-nocookie` iframes injected only on click. The 200-odd raster files under `assets/courses/**` are FAST homework **datasets** (downloaded, not displayed) and are deliberately left byte-for-byte intact. Any future in-UI image should be WebP/AVIF, lazy-loaded, with width/height set.
 - **XP is ledgered.** Every award has a key (`lesson:web-1-1`, `ex:dsa-2-1:0`, `mission:mission-maze`) paid out once — nothing can be farmed by re-doing.
 - **Learner code never touches the main thread.** `js/runner.js` is the single entry point for every execution path — `Runner.javascript` / `Runner.python` / `Runner.cpp` for tests, `Runner.computeJavascript` / `Runner.computePython` for visualizations — and they all return the same `{results[], output, error?}` / `{data, output, error?}` shape and share one results renderer, which shows what the code printed and words every error the same way in English and Armenian. JS runs in a Web Worker (3 s for tests, 15 s for a visualization) that is terminated on timeout; Python runs in a long-lived Pyodide worker with runs serialized, so a second click can never land mid-run on the shared interpreter, and every run gets a fresh namespace, so a function deleted from the editor can't keep passing the tests; C++ posts to `POST /api/run-cpp`. An accidental `while (true)` anywhere — tests *or* visualize — times out instead of freezing the tab.
-- **Lab and mission languages.** Every Lab problem and mission comes in JavaScript, Python and C++, all with the same `__check(name, actual, expected)` protocol. C++ is compiled by the `runner` container (`runner/cpp_runner.py`): the app hands it the program over a Unix socket, and it compiles and runs it as a throwaway user with no network and hard limits. Without Docker, `ACADEMY_CPP=1` (the dev default) compiles in-process on your own computer; never set it on a public server. Visualizations run from JS or Python only; each `LabViz.computeJS[kind]` is self-contained so its source can be shipped into the worker verbatim.
+- **Lab and mission languages.** Every Lab problem and mission comes in JavaScript, Python and C++, all with the same `__check(name, actual, expected)` protocol. C++ is compiled by the `runner` container (`runner/cpp_runner.py`): the app hands it the program over a Unix socket, and it compiles and runs it as a throwaway user with no network and hard limits. Without Docker, `ACADEMY_CPP=1` (an explicit development opt-in; disabled by default) compiles in-process on your own computer; never set it on a public server. Visualizations run from JS or Python only; each `LabViz.computeJS[kind]` is self-contained so its source can be shipped into the worker verbatim.
 - **Dev server sends `Cache-Control: no-store`** so edits to JS/CSS show up on reload instead of a stale cached bundle.
 - **Routing is the URL hash.** `tracks/dl.html#dl-2-2` deep-links to a lesson, `missions.html#mission-maze` to a mission.
 - **Theming is one attribute.** `data-theme="dark|light"` on `<html>` swaps CSS custom properties; each track sets its accent via `data-track` on `<body>`.
@@ -351,7 +353,7 @@ Add an `exercises: [...]` array to any lesson. Three types:
 The `code` type embeds the full editor + in-browser Python grader inside a
 lesson (used by the Programming for ML track — its exercises are the FAST
 course's real homework, often with the course's original asserts). The page
-must include `editor.js` and `pyrunner.js` (see `tracks/prog.html`). NumPy
+must include `editor.js` and `runner.js` (see `tracks/prog.html`). NumPy
 imports auto-download the package on first run.
 
 Course materials (slides, homework notebooks/PDFs, datasets) are local copies

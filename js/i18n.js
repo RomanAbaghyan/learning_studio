@@ -264,6 +264,10 @@ const I18N = (() => {
     "This page was opened without the backend, so sign-in is unavailable (your progress still saves on this device). To enable accounts, run this in the 1991 Academy folder:": "Այս էջը բացվել է առանց backend-ի, ուստի մուտքն անհասանելի է (առաջընթացդ դեռ պահվում է այս սարքում)։ Հաշիվները միացնելու համար 1991 Academy թղթապանակում գործարկի՛ր.",
     "member since {0}": "անդամ է {0}-ից",
     "✓ Synced at {0}": "✓ Համաժամացվեց {0}-ին",
+    "Progress changed in another session. Open Account to choose which copy to keep.": "Առաջընթացը փոխվել է մեկ այլ աշխատաշրջանում։ Բացիր հաշվի էջը՝ ընտրելու, թե որ տարբերակը պահել։",
+    "This device and your account have different progress. Choose which copy to keep. This replaces the other copy, including code drafts.": "Այս սարքի և հաշվի առաջընթացը տարբեր է։ Ընտրիր, թե որ տարբերակը պահել։ Մյուս տարբերակը կփոխարինվի՝ ներառյալ կոդի սևագրերը։",
+    "Keep this device's progress": "Պահել այս սարքի առաջընթացը",
+    "Use account progress": "Օգտագործել հաշվի առաջընթացը",
     "Sync failed: {0}": "Համաժամացումը ձախողվեց՝ {0}",
     /* change password */
     "Change password": "Փոխել գաղտնաբառը",

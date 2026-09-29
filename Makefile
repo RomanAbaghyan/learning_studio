@@ -105,7 +105,8 @@ restore: ## put a backup back: make restore FILE=backups/academy-<time>.db.gz
 	@echo "==> Snapshotting the current database first, just in case"
 	$(COMPOSE) run --rm -T --no-deps app bash deploy/backup.sh \
 	  || { $(COMPOSE) start app; echo "That backup failed, so nothing was restored."; exit 1; }
-	gunzip -c "$(FILE)" | $(COMPOSE) run --rm -T --no-deps app sh -c 'rm -f /data/academy.db-wal /data/academy.db-shm && cat > /data/academy.db'
+	$(COMPOSE) run --rm -T --no-deps app python deploy/restore.py < "$(FILE)" \
+	  || { $(COMPOSE) start app; echo "Restore failed; inspect the error above. A pre-restore backup is available."; exit 1; }
 	$(COMPOSE) up -d --wait app
 	@echo "==> Restored $(FILE)"
 
