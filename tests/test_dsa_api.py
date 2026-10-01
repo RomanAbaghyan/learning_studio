@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from dsa_api import build_dsa_router
+from backend.dsa_api import build_dsa_router
 
 
 @pytest.fixture
@@ -137,7 +137,7 @@ def test_external_provider_is_explicit_and_contextual(content, monkeypatch):
             sent.append(request)
             return Response()
 
-    monkeypatch.setattr("dsa_api.urllib.request.build_opener", lambda *args: Opener())
+    monkeypatch.setattr("backend.dsa_api.urllib.request.build_opener", lambda *args: Opener())
     api = client(content)
     api.get("/api/dsa/lessons/binary-search")
     assert sent == []
@@ -158,7 +158,7 @@ def test_external_provider_failure_redacts_secrets(content, monkeypatch):
     def failed(*args):
         raise OSError("secret URL or credential")
 
-    monkeypatch.setattr("dsa_api.urllib.request.build_opener", failed)
+    monkeypatch.setattr("backend.dsa_api.urllib.request.build_opener", failed)
     response = client(content).post("/api/dsa/tutor", json={"lessonId": "binary-search", "question": "Why?"})
     assert response.status_code == 502
     assert "secret" not in response.text
@@ -205,7 +205,7 @@ def test_navigation_reference_validation(content, mutation):
 
 
 def test_real_catalog_hierarchy_canonical_aliases_and_foundation_lessons():
-    root = Path(__file__).resolve().parents[1] / 'content' / 'dsa'
+    root = Path(__file__).resolve().parents[1] / 'backend' / 'content' / 'dsa'
     api = client(root)
     response = api.get('/api/dsa/catalog')
     assert response.status_code == 200

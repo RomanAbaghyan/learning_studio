@@ -13,7 +13,7 @@ A personal learning platform: seven structured tracks — **Mathematics for ML, 
 
 Plus **accounts**: register/sign in with username-or-email + password, and progress syncs to a local SQLite database — sign in on any device on your network and continue where you left off. Guests lose nothing: everything also works signed-out, stored in the browser.
 
-No build step; the frontend is pure dependency-free HTML/CSS/JS. The backend is a single FastAPI app (`app.py`) — the one place dependencies live (`requirements.txt` + `.venv`).
+No build step; the frontend is pure dependency-free HTML/CSS/JS. The backend is a single FastAPI app (`backend/app.py`) — the one place dependencies live (`backend/requirements/` + `.venv`).
 
 ## Bilingual: English / Հայերեն
 
@@ -47,15 +47,32 @@ Pyodide loader's status strings route through `t()`. To translate more, add
 
 ## Run it
 
+Docker development (Docker Engine/Desktop and Compose v2):
+
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once
-.venv/bin/python app.py
+make up                     # http://localhost:8735, automatic reload
+make docker-test            # isolated tests, no local Python setup needed
+make logs                   # follow logs
+make down                   # stop, preserve database
+```
+
+For local Python development: `make setup`, then `make dev`. Run `make check`
+with Node.js installed for the full regression suite and content validation.
+`make help` lists build, status, backup, restore, and deployment commands.
+Docker uses a separate persistent database; existing local accounts are not
+imported automatically. C++ execution is opt-in for trusted local use with
+`ACADEMY_CPP=1 make up` (Docker) or `ACADEMY_CPP=1 make dev` (Python).
+See [deployment guide](docs/DEPLOYMENT.md) for production HTTPS and operations.
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r backend/requirements/runtime.lock   # once
+.venv/bin/python -m backend.app
 # → http://localhost:8735   (accounts, sync, leaderboard, C++ runner)
 ```
 
-Production setup (HTTPS, systemd, env flags): see `DEPLOYMENT.md`.
+Production setup (HTTPS, systemd, env flags): see `docs/DEPLOYMENT.md`.
 
-`app.py` is an ordinary ASGI app, so `.venv/bin/uvicorn app:app --port 8735`
+`backend/app.py` is an ordinary ASGI app, so `.venv/bin/uvicorn backend.app:app --port 8735`
 works too — the schema and the expiry sweep are set up by its lifespan handler,
 not by `__main__`.
 
@@ -64,7 +81,7 @@ not by `__main__`.
 > deletion, the leaderboard and `/api/health` all 404'd under it) and carried
 > none of the rate limiting, body caps, security headers or path allowlist.
 
-Or just open `index.html` / serve statically with `python3 -m http.server` — the site fully works, accounts are simply disabled (the account page explains how to enable them).
+Or just open `frontend/index.html` / serve statically with `python3 -m http.server --directory frontend` — the site fully works, accounts are simply disabled (the account page explains how to enable them).
 
 ### Account management
 
@@ -80,56 +97,45 @@ new week).
 ### Tests
 
 ```bash
-.venv/bin/pip install -r requirements-dev.txt   # pytest + httpx, dev only
-.venv/bin/pytest -q                              # 18 API tests, temp DB, no real accounts touched
+.venv/bin/pip install -r backend/requirements/dev.lock   # pytest + httpx, dev only
+.venv/bin/pytest -q                              # complete regression suite, temporary test databases
 ```
 
 ## Structure
 
+```text
+learning_studio/
+├── backend/                 FastAPI application and server-owned content
+│   ├── app.py               Accounts, sessions, progress, static serving
+│   ├── dsa_api.py           DSA catalog and tutor API
+│   ├── content/dsa/         Validated catalogs and lesson JSON
+│   └── requirements/        Base/dev dependency inputs and pinned locks
+├── frontend/                Public web root (no frontend build step)
+│   ├── *.html               Dashboard, account, lab, missions, practice
+│   ├── tracks/              Track page shells
+│   ├── css/                 Tokens, base styles, components, DSA styles
+│   ├── js/                  UI controllers, runners, stores, translations
+│   │   └── data/            Track content and bilingual content packs
+│   └── assets/courses/      Course PDFs, notebooks, datasets, starter code
+├── docker/                  Container and deployment configuration
+│   ├── Dockerfile           Development and production image targets
+│   ├── compose.yaml         Local development with reload
+│   ├── compose.production.yaml  Production app and HTTPS proxy
+│   └── Caddyfile            Automatic TLS and trusted proxy headers
+├── tests/                   Python and Node regression suites
+│   └── browser/             Playwright browser smoke checks
+├── tools/                   Content validation, DB snapshots, smoke checks
+├── docs/                    Deployment, architecture and content audits
+│   └── archive/             Historical session notes
+├── .github/                 CI, container releases, dependency updates
+├── Makefile                 Development and operational commands
+├── .env.example             Optional local settings template
+├── .env.production.example  Production settings template
+└── README.md
 ```
-1991 Academy/
-├── app.py                FastAPI backend: auth, sync, leaderboard, C++ runner, static
-├── DEPLOYMENT.md         HTTPS / systemd / env-flag production guide
-├── index.html            Dashboard: goal ring, level, tracks, missions, badges
-├── missions.html         Cross-track coding challenges (editor + tests)
-├── lab.html              The Lab: implement + visualize problems
-├── practice.html         Spaced-repetition review sessions
-├── account.html          Sign in / create account / profile
-├── tracks/               One shell page per track (identical except track id)
-│   ├── math.html  web.html  ml.html  dl.html  agents.html  dsa.html
-├── css/
-│   ├── tokens.css        Design tokens: colors, fonts, radii (dark/light themes)
-│   ├── base.css          Reset + typography + layout primitives
-│   ├── components.css    Navbar, cards, lesson reader, quiz, toast…
-│   └── game.css          XP pill, goal ring, exercises, missions, practice
-└── js/
-    ├── common.js         Namespace, theme toggle, queued toasts, helpers
-    ├── auth.js           Session check, login/register calls, progress sync
-    ├── account-page.js   Account page: forms + profile
-    ├── progress.js       localStorage: lesson completion, streak
-    ├── xp.js             XP ledger, levels, daily goal, achievements
-    ├── review.js         Spaced-repetition card store & scheduling
-    ├── exercises.js      Parsons/blanks/match/problem/code renderers
-    ├── editor.js         Code editor: highlight, line numbers, auto-close brackets
-    ├── runner.js         ALL sandboxed execution: JS + Python in Web Workers,
-    │                     C++ via the API, plus the shared test-results renderer
-    ├── main.js           Landing page rendering
-    ├── track.js          Track page: sidebar, lesson reader, quiz engine, routing
-    ├── missions-page.js  Mission cards, lock logic, editor, test UI
-    ├── lab-page.js       Lab problem browser, editor, multi-language run, visualize
-    ├── lab-viz.js        Canvas renderers driven by the learner's code
-    ├── practice-page.js  Review session flow
-    └── data/             All content lives here
-        ├── math.js  web.js  ml.js  dl.js  agents.js  dsa.js   (tracks)
-        ├── ml-course.js  dl-course.js                         (FAST course rebuilds of the ml/dl tracks)
-        ├── math-exercises.js  math-exercises-2.js             (math homework problems + course materials)
-        ├── missions.js                                        (cross-track missions)
-        ├── lab.js                                             (Lab problems + JS + viz configs)
-        ├── lab-py.js                                          (Python variants of Lab problems)
-        ├── lab-cpp.js                                         (C++ variants of the pure-algorithm problems)
-        ├── i18n-hy.js                                         (Armenian: UI chrome + all titles + Lab cards)
-        └── i18n-hy-{web,dsa,agents,math,ml,dl,prog,missions,lab}.js  (Armenian per-track/section content packs)
-```
+
+See [the directory guide](docs/PROJECT_STRUCTURE.md) for path conventions.
+Runtime databases, virtual environments, local secrets, and backups are ignored.
 
 ## How it works
 
@@ -137,7 +143,7 @@ new week).
 - **State is local-first.** Progress (`martinium:progress:v1`), XP/badges (`martinium:xp:v1`), review cards (`martinium:review:v1`), the language choice (`martinium:lang`) and code drafts (`martinium:draft:*`) live in localStorage. Signed in, the same keys are pushed to `/api/state` ~1.5 s after every change (coalesced into one request, and flushed on `pagehide`) and pulled back on any device you sign in on. Conflict rule: the copy with more XP wins; signing in as a *different* user on a shared device always adopts that account's server copy. The theme and per-problem editor language stay device-local on purpose.
 - **State changes are announced, not reloaded.** `Progress`/`XP`/`Review` cache their parsed blob, so a render pass parses it once instead of forty times. Anything that rewrites those keys from outside — a sync pull, or another tab — calls `notifyStateChanged()` (`js/common.js`), which drops the caches and fires `martinium:state-changed`; page controllers subscribe with `onStateChanged(render)` and redraw in place. Open editors and in-progress practice sessions are deliberately left alone. Only a language change still forces a reload, because the language is baked into every rendered string.
 - **If a sync fails, you are told once.** Oversized payloads shed the largest code drafts first so progress always gets through; a 401 signs you out cleanly; repeated failures toast once, not every 1.5 seconds.
-- **Auth is boring on purpose.** Passwords are scrypt-hashed with per-user salts; sessions are random tokens in an HttpOnly cookie (30 days); users, sessions and state blobs live in `1991_academy.db` (SQLite). The FastAPI backend adds rate limiting (login/register/reset/C++ runner), request-size caps, structured logging, `/api/health` and env-based config — see `DEPLOYMENT.md` before exposing it to the open internet (HTTPS required; set `ACADEMY_CPP=0` publicly). Change-password and password-reset rotate the hash and invalidate sessions; reset tokens are SHA-256-hashed, single-use and expire in 1 hour; `forgot-password` always returns the same response (no email enumeration). Expired sessions and reset tokens are swept at startup and hourly.
+- **Auth is boring on purpose.** Passwords are scrypt-hashed with per-user salts; sessions are random tokens in an HttpOnly cookie (30 days); users, sessions and state blobs live in `1991_academy.db` (SQLite). The FastAPI backend adds rate limiting (login/register/reset/C++ runner), request-size caps, structured logging, `/api/health` and env-based config — see `docs/DEPLOYMENT.md` before exposing it to the open internet (HTTPS required; set `ACADEMY_CPP=0` publicly). Change-password and password-reset rotate the hash and invalidate sessions; reset tokens are SHA-256-hashed, single-use and expire in 1 hour; `forgot-password` always returns the same response (no email enumeration). Expired sessions and reset tokens are swept at startup and hourly.
 - **Nothing blocking runs on the event loop.** SQLite, scrypt and the C++ subprocess all go through `run_in_threadpool`. This matters: a single 25-second C++ compile used to stall every other request on the server, including static files.
 - **The web root is an allowlist, not a blocklist.** Only `/`, the five page files and the `css/ js/ tracks/ assets/` trees are reachable. The previous extension blocklist could be walked around by case (`/APP.PY` resolves to `app.py` on macOS and Windows volumes, which served the backend source and the credentials database) and simultaneously 404'd the legitimate `.py` starter files under `assets/courses/`.
 - **The database is indexed.** `init_db()` creates `CREATE INDEX IF NOT EXISTS` entries on every start (idempotent, data-safe, and applied to existing DBs too): case-insensitive `username`/`email` for login-by-either, a composite `(leaderboard_opt_in, xp_total DESC)` so the leaderboard is an indexed search rather than a full scan, and `sessions(user_id)` for per-user session cleanup. Session-token, `state.user_id` and the UNIQUE columns are already covered by their PRIMARY KEY / UNIQUE constraints.
@@ -224,7 +230,7 @@ Sidebar, progress, quiz and navigation pick it up automatically.
 
 ## DSA Studio
 
-Open `tracks/dsa.html` through `.venv/bin/python app.py` for the expanded learning workspace. The original lessons remain at `tracks/dsa-legacy.html`; old `#dsa-*` links redirect there without changing completion IDs.
+Open `tracks/dsa.html` through `.venv/bin/python -m backend.app` for the expanded learning workspace. The original lessons remain at `tracks/dsa-legacy.html`; old `#dsa-*` links redirect there without changing completion IDs.
 
 Eight published units cover Algorithmic Thinking, Complexity, Arrays, Linked Lists, Binary Search, AVL Tree, Dijkstra, and 0/1 Knapsack. They share reversible teaching timelines, conceptual memory/variables/counters, implementation references, runnable practice, quizzes, separate mastery evidence, notes and bookmarks. Linked Lists adds pointer-reassignment traces and node-identity checks. The catalog contains 113 prerequisite-linked topics in a nested hierarchy, but most advanced entries are explicitly planned; catalog membership does not imply a finished lesson. Fibonacci Tree is skipped at the learner’s request and remains unpublished.
 

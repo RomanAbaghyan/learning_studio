@@ -1,6 +1,6 @@
 # DSA content and API contract
 
-DSA content lives in `content/dsa/catalog.json` and `content/dsa/lessons/{id}.json`.
+DSA content lives in `backend/content/dsa/catalog.json` and `backend/content/dsa/lessons/{id}.json`.
 The FastAPI router is registered by `app.include_router(build_dsa_router())` before
 static-file routing. It adds no database tables: learner state uses the existing
 account-scoped `/api/state` sync mechanism. Completion and mastery are distinct

@@ -9,12 +9,12 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from fastapi import HTTPException
-from dsa_api import ContentStore
+from backend.dsa_api import ContentStore
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--content-dir', type=Path, default=ROOT / 'content' / 'dsa')
+    parser.add_argument('--content-dir', type=Path, default=ROOT / 'backend' / 'content' / 'dsa')
     args = parser.parse_args()
     try:
         catalog, lessons = ContentStore(args.content_dir).load()

@@ -15,6 +15,10 @@ __pycache__/
 # Local secrets (SMTP credentials etc.)
 .env
 .env.*
+!.env.example
+!.env.production.example
+backups/
+artifacts/
 
 # macOS
 .DS_Store

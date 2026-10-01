@@ -1,0 +1,112 @@
+name: CI and container release
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: 'backend/requirements/*.lock'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm install --global typescript@5.9.3
+      - run: make setup check
+      - name: Validate Compose configurations
+        run: |
+          make config
+          cp .env.production.example .env.production
+          make ENV=prod config
+
+  container:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build production image for verification
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: production
+          load: true
+          tags: learning-studio:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test hardened production container
+        run: |
+          docker run -d --name academy-ci --read-only --tmpfs /tmp --cap-drop ALL \
+            --security-opt no-new-privileges -p 127.0.0.1:8735:8735 \
+            -v academy-ci-data:/data learning-studio:ci
+          for attempt in $(seq 1 30); do
+            if [ "$(docker inspect --format '{{.State.Health.Status}}' academy-ci)" = healthy ]; then break; fi
+            sleep 2
+          done
+          test "$(docker inspect --format '{{.State.Health.Status}}' academy-ci)" = healthy
+          python3 tools/smoke.py
+          docker exec academy-ci python -c "import backend.app as app; assert not app.DEBUG and not app.ENABLE_CPP and app.SECURE_COOKIES"
+          docker exec academy-ci python tools/database.py backup > /tmp/academy-ci.db
+          python3 tools/database.py validate /tmp/academy-ci.db
+          docker restart academy-ci
+      - name: Container logs
+        if: always()
+        run: docker logs academy-ci
+      - name: Remove verification container
+        if: always()
+        run: docker rm -f academy-ci
+      - name: Validate HTTPS proxy configuration
+        run: |
+          docker run --rm -e ACADEMY_DOMAIN=academy.example.com -e ACME_EMAIL=admin@example.com \
+            -v "${{ github.workspace }}/docker/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Authenticate to GHCR
+        if: github.event_name == 'push' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish verified image
+        if: github.event_name == 'push' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

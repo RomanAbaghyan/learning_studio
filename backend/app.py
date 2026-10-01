@@ -2,8 +2,8 @@
 """
 1991 Academy backend — FastAPI.
 
-    .venv/bin/python app.py                # http://localhost:8735
-    .venv/bin/uvicorn app:app --port 8735  # equivalent (schema set up on startup)
+    .venv/bin/python -m backend.app                # http://localhost:8735
+    .venv/bin/uvicorn backend.app:app --port 8735  # equivalent (schema set up on startup)
 
 Serves the static site and the JSON API.
 
@@ -82,7 +82,8 @@ from starlette.middleware.gzip import GZipMiddleware
 
 VERSION = "2.3"
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
+FRONTEND_ROOT = ROOT / "frontend"
 PORT = int(os.environ.get("PORT", 8735))
 DB_PATH = os.environ.get("ACADEMY_DB", str(ROOT / "1991_academy.db"))
 DEBUG = os.environ.get("ACADEMY_DEBUG", "1") == "1"
@@ -1136,11 +1137,11 @@ async def api_health():
 
 # static site LAST so /api/* wins (the guard middleware has already restricted
 # which paths can reach it)
-from dsa_api import build_dsa_router
+from backend.dsa_api import build_dsa_router
 
 app.include_router(build_dsa_router())
 
-app.mount("/", StaticFiles(directory=str(ROOT), html=True), name="site")
+app.mount("/", StaticFiles(directory=str(FRONTEND_ROOT), html=True), name="site")
 
 
 if __name__ == "__main__":

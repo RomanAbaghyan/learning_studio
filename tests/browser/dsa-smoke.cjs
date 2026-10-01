@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const base=process.env.DSA_TEST_URL || 'http://127.0.0.1:8746';
-const content=id=>JSON.parse(fs.readFileSync(path.join(__dirname,'../../content/dsa/lessons',id+'.json'),'utf8'));
+const content=id=>JSON.parse(fs.readFileSync(path.join(__dirname,'../../backend/content/dsa/lessons',id+'.json'),'utf8'));
 const extras={ 'avl-tree': 'function isBalanced(n){function h(n){if(!n)return 0;const a=h(n.left),b=h(n.right);return a<0||b<0||Math.abs(a-b)>1?-1:1+Math.max(a,b);}return h(n)>=0;}', dijkstra:'function relax(d,u,v,w){if(d[u]+w<d[v]){d[v]=d[u]+w;return true;}return false;}'};
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH || '/snap/bin/chromium',args:['--no-sandbox']});

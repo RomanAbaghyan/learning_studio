@@ -8,7 +8,7 @@ function setup(initial = null) {
   let syncs = 0;
   const context = {localStorage: {getItem: key => values.get(key) ?? null, setItem: (key,value) => values.set(key,value)}, window: {Sync: {schedule: () => syncs++}}};
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync('js/dsa-store.js','utf8') + '\nthis.store = DSAStore;', context);
+  vm.runInContext(fs.readFileSync('frontend/js/dsa-store.js','utf8') + '\nthis.store = DSAStore;', context);
   return {store: context.store, values, syncs: () => syncs};
 }
 

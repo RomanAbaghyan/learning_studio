@@ -1,0 +1,33 @@
+name: learning-studio-dev
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: development
+    environment:
+      PORT: "8735"
+      ACADEMY_DB: /data/academy.db
+      ACADEMY_DEBUG: "1"
+      ACADEMY_CPP: "${ACADEMY_CPP:-0}"
+      ACADEMY_SECURE_COOKIES: "0"
+      ACADEMY_TRUST_PROXY: "0"
+      ACADEMY_BASE_URL: "http://localhost:${APP_PORT:-8735}"
+    ports:
+      - "127.0.0.1:${APP_PORT:-8735}:8735"
+    volumes:
+      - ..:/app:ro
+      - academy-data:/data
+    tmpfs:
+      - /tmp:mode=1777
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+volumes:
+  academy-data:

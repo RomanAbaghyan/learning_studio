@@ -1,6 +1,6 @@
 """API tests for the 1991 Academy backend.
 
-    .venv/bin/pip install -r requirements-dev.txt
+    .venv/bin/pip install -r backend/requirements/dev.lock
     .venv/bin/pytest -q
 
 Every test runs against its own fresh temp SQLite DB (the `client` fixture
@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import app  # noqa: E402
+import backend.app as app  # noqa: E402
 
 
 @pytest.fixture

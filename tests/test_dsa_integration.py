@@ -4,7 +4,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-import app
+import backend.app as app
 
 
 @pytest.fixture

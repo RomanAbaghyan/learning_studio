@@ -1,0 +1,11 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$ACADEMY_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:8735 {
+		# App trusts only this header; overwrite any value from the client.
+		header_up X-Forwarded-For {remote_host}
+	}
+}

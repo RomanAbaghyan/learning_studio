@@ -28,7 +28,7 @@ function context(values = {}, handler) {
   };
   ctx.window = ctx;
   vm.createContext(ctx);
-  vm.runInContext(fs.readFileSync('js/auth.js', 'utf8') + '\nthis.Auth = Auth;', ctx);
+  vm.runInContext(fs.readFileSync('frontend/js/auth.js', 'utf8') + '\nthis.Auth = Auth;', ctx);
   return { ctx, store, requests };
 }
 const xp = 'martinium:xp:v1';

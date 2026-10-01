@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-require('../js/dsa-traces.js');
+require('../frontend/js/dsa-traces.js');
 const { generate, defaults } = globalThis.DSATraces;
 let seed = 73;
 const random = n => { seed = (1664525 * seed + 1013904223) >>> 0; return seed % n; };

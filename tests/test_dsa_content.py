@@ -10,7 +10,7 @@ import subprocess
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1] / 'content' / 'dsa'
+ROOT = Path(__file__).resolve().parents[1] / 'backend' / 'content' / 'dsa'
 REFERENCE_LESSONS = ['binary-search', 'avl-tree', 'dijkstra', 'knapsack', 'algorithmic-thinking', 'complexity', 'arrays', 'linked-lists']
 
 
@@ -166,7 +166,7 @@ def test_compiled_reference_implementations(name, language, tmp_path):
 
 @pytest.mark.parametrize('name', REFERENCE_LESSONS)
 def test_cpp_exercise_harness_uses_existing_runner_protocol(name):
-    import app
+    import backend.app as app
     if not app.CPP_COMPILER:
         pytest.skip('C++ compiler unavailable')
     problem = lesson(name)['problems'][0]

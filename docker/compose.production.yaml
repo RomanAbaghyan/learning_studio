@@ -1,0 +1,59 @@
+# Standalone production stack; do not merge with compose.yaml.
+name: learning-studio-prod
+services:
+  app:
+    image: "${ACADEMY_IMAGE:-learning-studio:local}"
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+    env_file: "${ACADEMY_ENV_FILE:-../.env.production}"
+    environment:
+      PORT: "8735"
+      ACADEMY_DB: /data/academy.db
+      ACADEMY_DEBUG: "0"
+      ACADEMY_CPP: "0"
+      ACADEMY_SECURE_COOKIES: "1"
+      ACADEMY_TRUST_PROXY: "1"
+      ACADEMY_BASE_URL: "https://${ACADEMY_DOMAIN:?Set ACADEMY_DOMAIN in .env.production}"
+    volumes:
+      - academy-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=64m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    cpus: "1.0"
+    mem_limit: 512m
+    pids_limit: 128
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+  proxy:
+    image: caddy:2.10.2-alpine
+    environment:
+      ACADEMY_DOMAIN: "${ACADEMY_DOMAIN:?Set ACADEMY_DOMAIN in .env.production}"
+      ACME_EMAIL: "${ACME_EMAIL:?Set ACME_EMAIL in .env.production}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+volumes:
+  academy-data:
+  caddy-data:
+  caddy-config:
