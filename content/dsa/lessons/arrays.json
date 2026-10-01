@@ -1,0 +1,323 @@
+{
+  "id": "arrays",
+  "title": "Arrays: Representation, Growth and Locality",
+  "summary": "Connect sequence operations to contiguous storage, prove amortized growth, and reason about copying, references and cache behavior.",
+  "objectives": [
+    "Distinguish the sequence ADT, fixed arrays and dynamic-array implementations",
+    "Derive address formulas and operation costs",
+    "Maintain size/capacity and live-prefix invariants",
+    "Prove amortized append while identifying latency spikes",
+    "Implement stable insertion and deletion with correct shift direction",
+    "Compare language representations and cache behavior"
+  ],
+  "sections": [
+    {
+      "id": "motivation",
+      "title": "Why this matters",
+      "body": "Arrays support efficient indexed access and sequential processing, making them a foundation for heaps, hash tables, DP tables and storage buffers. Their speed comes from a representation that turns an index into an address. That same compact representation makes insertion in the middle expensive: maintaining sequence order requires movement. Understanding both sides explains why a container can offer fast lookup yet slow updates."
+    },
+    {
+      "id": "intuition",
+      "title": "Intuition: addresses from position",
+      "body": "Imagine numbered equal-width slots in a contiguous region. Given the first slot and a position, calculate the destination directly rather than following links. For element width w bytes and base address B, zero-based index i has address B+i·w. With B=4096, w=4, index 3 begins at 4108. The formula requires fixed-width slots and a valid index; it does not say every object stored through a slot also lives inline."
+    },
+    {
+      "id": "adt",
+      "title": "The sequence ADT and its representations",
+      "body": "A sequence ADT defines an ordered collection supporting length, read(i), write(i,x), insert(i,x), remove(i), and iteration. A fixed array provides a fixed count of addressable slots. A dynamic array implements a variable-length sequence with a fixed backing array plus a logical size. A linked list implements a similar sequence interface through links, with different costs. Distinguish what operations mean from how they are implemented.\n\nOur educational IntArray uses a backing buffer, size n and capacity c. Valid element indices are 0≤i<n; insertion positions are 0≤i≤n. Capacity is an implementation detail, not a promise that indices up to c−1 contain sequence elements. Empty input has n=0 even if a reserved buffer has c>0."
+    },
+    {
+      "id": "invariant",
+      "title": "Representation invariant",
+      "body": "Maintain 0≤n≤c. The live prefix buffer[0:n] equals the logical sequence in order; buffer[n:c] is spare storage. Only the live prefix may be returned or traversed as elements. For references, clear obsolete slots after deletion so the backing buffer does not retain objects that the logical sequence no longer contains. The Python and JavaScript models use None/null as a spare-slot marker; C++/Java integer models use zero, which remains a valid value inside the live prefix. The size field, not a sentinel value, decides which elements exist."
+    },
+    {
+      "id": "read",
+      "title": "Indexing, writes, traversal and search",
+      "body": "Read and write validate against n, then access one slot: Θ(1) word operations under the fixed-width model. Traversing reads n slots, so Θ(n). Searching an unsorted array for an absent value requires n comparisons in the worst case; direct access by index does not provide direct access by value. A sorted array permits O(log n) binary search comparisons, but maintaining sorted order during arbitrary inserts still costs movement. A slice producing k copied elements takes Θ(k) work and storage; a view may avoid copying but introduces aliasing and lifetime constraints."
+    },
+    {
+      "id": "insert",
+      "title": "Insertion: shift from the right",
+      "body": "To insert x at index i, first ensure a spare slot. Move buffer[n−1] to buffer[n], then buffer[n−2] to buffer[n−1], continuing down to i. Finally write x at i and increment n. The loop moves right to left so every source is read before being overwritten. Shifting left to right would replicate an already overwritten value.\n\nFor [10,20,30], insert 15 at 1: move 30 to slot 3, move 20 to slot 2, write 15 at slot 1, then set size=4. Exactly n−i old elements move; insertion at the end moves none, insertion at the front moves n. A resize, when needed, adds another linear copy."
+    },
+    {
+      "id": "delete",
+      "title": "Deletion: close the gap from the left",
+      "body": "To remove index i, save its value. Move buffer[i+1] to buffer[i], then each successor left by one. Decrement n and clear the old final slot. This preserves relative order and moves n−i−1 elements. Moving right to left would overwrite sources before they are consumed. Removing the last element requires no shifts.\n\nIf order does not matter, replacing the removed element with the last and shrinking gives constant-time deletion after the index is known. That is a different contract. Sparse sets exploit this idea while maintaining an index map. A UI list, sorted sequence or time-ordered event log usually cannot silently adopt it."
+    },
+    {
+      "id": "growth",
+      "title": "Append, capacity and resizing",
+      "body": "Append writes at index n when n<c. When n=c, allocate max(1,2c) slots, copy n live elements, replace the backing buffer and append. Size grows by one; capacity changes only at a growth event. The trace shows both allocations while copying. During growth from c to 2c, up to 3c backing slots coexist before the old allocation is released. Allocation initialization may itself touch Θ(c) slots; copy counters in the trace count live element copies, not every allocator operation.\n\nThe implementation deliberately exposes growth rather than delegating it to list.append or vector.push_back. It is a bounded teaching model, not a production generic container: allocation failure, maximum capacity, element constructors, exceptions and iterator contracts need additional design."
+    },
+    {
+      "id": "amortized",
+      "title": "Why geometric growth gives amortized constant append",
+      "body": "Starting from capacity zero, copied live elements at growth sizes are 1,2,4,...,2^k. For m≥1 appends their sum is less than 2m, and there are m writes of new values. Thus fewer than 3m element writes occur in this simplified model, giving Θ(m) total work and O(1) amortized append. A growth-triggering append remains Θ(n); amortized is not worst-case latency.\n\nGrowing capacity by a fixed increment instead copies a sequence proportional to 1+2+...+m, giving Θ(m²) total work. Multiplying capacity by any fixed factor greater than one yields geometric total copying, with a tradeoff between wasted capacity and frequency of reallocations. Real containers need not use exactly doubling."
+    },
+    {
+      "id": "shrink",
+      "title": "Deletion, shrinking and hysteresis",
+      "body": "Our model keeps capacity after deletion; this avoids thrashing but can retain substantial storage. A policy that halves when half full can alternate expensive grow/shrink operations around one threshold. Introduce hysteresis: for example, double when full and halve only when at most one-quarter full, subject to a minimum capacity. Many updates are then required between opposite resize events, allowing an amortized proof. Choosing never to shrink is also legitimate when predictable reuse matters more than releasing peak allocation."
+    },
+    {
+      "id": "proof",
+      "title": "Correctness of movement and reallocation",
+      "body": "During right-to-left insertion shifting, every element strictly to the right of the current source has already been copied to its final position, and the unprocessed prefix is untouched. This invariant prevents data loss. At completion the gap at i can receive x without changing earlier elements. Deletion uses the symmetric left-to-right argument. Reallocation copies every live index to the same index in the new buffer; the sequence is unchanged, only its storage location and capacity differ. Bounds checks precede mutation, so an invalid index does not partially change the sequence."
+    },
+    {
+      "id": "languages",
+      "title": "What is actually contiguous in each language?",
+      "body": "C++ vector<int> stores its int elements contiguously; reallocation invalidates pointers and references into that buffer. In our C++ teaching model the vector length represents backing capacity and a separate n is logical size. A CPython list holds a contiguous array of references, not inline arbitrary-precision integers. Java int[] holds primitive integers, while object arrays hold references. A JavaScript Array is a language-level object with implementation-dependent representation; typed arrays provide a more explicit fixed-width view. Do not derive actual process addresses from the visual teaching addresses.\n\nThe supplied implementations use integers and practical small inputs. C++/Java capacities use signed integer arithmetic and require an upper bound far below overflow; production growth code must check maximum allocatable size before doubling. Python copying references is different from recursively copying referenced objects. Switching implementation language changes representation details while preserving the sequence contract."
+    },
+    {
+      "id": "locality",
+      "title": "Cache locality and memory bandwidth",
+      "body": "A cache line brings neighboring bytes into a faster cache. A sequential scan of packed elements can use many values from each fetched line and allow hardware prefetching. Following separately allocated nodes introduces dependent addresses and may use only a small portion of each line. These are reasons arrays often perform well even when asymptotic bounds match. They are not universal timing guarantees: allocation layout, working-set size, element width and access order matter. Use the Memory Lab to compare explicit modeled addresses, and distinguish that model from runtime measurement."
+    },
+    {
+      "id": "multidimensional",
+      "title": "Multidimensional arrays and stride",
+      "body": "In a row-major R×C packed array, (r,c) maps to flat index r·C+c and address B+(r·C+c)w. Moving across a row advances one element; moving down a column advances C elements. Loop order can therefore affect locality without changing Θ(RC) work. A nested list of lists is not automatically one packed rectangle: rows may be separately allocated or have different lengths. Validate dimensions before flattening. A transpose view can exchange strides without moving payloads, while producing a new contiguous transposed array requires Θ(RC) writes."
+    },
+    {
+      "id": "prefix",
+      "title": "Prefix operations connect arrays to range queries",
+      "body": "Define P[0]=0 and P[i+1]=P[i]+a[i]. Then the sum over half-open [l,r) is P[r]−P[l]. The extra initial zero makes empty ranges and ranges beginning at zero follow the same formula. Building P costs Θ(n); each later sum is Θ(1). Updating a single a[i] changes all later prefix values, so this representation suits static or batched data. Fenwick and segment trees trade extra query work for efficient updates. A prefix sum is an added index over the array, not a faster raw-array sum operation."
+    },
+    {
+      "id": "mistakes",
+      "title": "Edge cases and common mistakes",
+      "body": "Test empty construction, first append from zero capacity, append at a full buffer, insert at 0 and n, removal at both ends, repeated equal values, and rejected indices −1 and n for reads. Distinguish Python negative-index syntax from this ADT, which rejects negative indices. Do not increment size before ensuring storage or validate against capacity instead of size. A saved pointer into an old C++ buffer may dangle after growth. A saved index can also refer to a different element after insertion even when allocation does not change."
+    },
+    {
+      "id": "compare",
+      "title": "When to choose another representation",
+      "body": "Arrays suit frequent indexing, bulk scans and append-heavy workloads. Linked nodes can support constant-time splicing when the relevant nodes or predecessor are already known; locating them can still cost linear traversal. Deques reduce front-removal costs; gap buffers or ropes target particular editing workloads; B+ trees organize external-memory ordered indexes. Choose using the operations and stability guarantees the application needs. A structure with an attractive bound for one operation may pay in memory, locality or implementation complexity."
+    },
+    {
+      "id": "exercises",
+      "title": "Exercises and deeper extensions",
+      "body": "Prove the exact number of moved elements for stable removal. Implement reserve without changing logical size. Add quarter-full shrinking and show why alternating one insert and one delete cannot force a resize every time. Compare array-of-structures and structure-of-arrays layouts for scanning one field. Advanced challenge: design incremental copying that bounds per-append migration work, and state how reads find elements while two buffers coexist."
+    }
+  ],
+  "pseudocode": "INSERT(i, x):\n    require 0 ≤ i ≤ size\n    if size = capacity: allocate max(1, 2×capacity); copy live prefix\n    for j = size down to i+1: buffer[j] ← buffer[j−1]\n    buffer[i] ← x; size ← size+1\n\nERASE(i):\n    require 0 ≤ i < size\n    save buffer[i]\n    for j = i to size−2: buffer[j] ← buffer[j+1]\n    size ← size−1; clear buffer[size]\n    return saved value",
+  "implementations": {
+    "python": "class IntArray:\n    \"\"\"Educational backing-buffer model; Python slots hold references.\"\"\"\n    def __init__(self):\n        self.slots = []\n        self.size = 0\n\n    def insert(self, i, value):\n        if not 0 <= i <= self.size:\n            raise IndexError(i)\n        if self.size == len(self.slots):\n            grown = [None] * max(1, 2 * len(self.slots))\n            for j in range(self.size):\n                grown[j] = self.slots[j]\n            self.slots = grown\n        for j in range(self.size, i, -1):\n            self.slots[j] = self.slots[j - 1]\n        self.slots[i] = value\n        self.size += 1\n\n    def append(self, value):\n        self.insert(self.size, value)\n\n    def get(self, i):\n        if not 0 <= i < self.size:\n            raise IndexError(i)\n        return self.slots[i]\n\n    def set(self, i, value):\n        self.get(i)  # validate logical bounds\n        self.slots[i] = value\n\n    def erase(self, i):\n        result = self.get(i)\n        for j in range(i, self.size - 1):\n            self.slots[j] = self.slots[j + 1]\n        self.size -= 1\n        self.slots[self.size] = None  # release the obsolete reference\n        return result\n\n    def values(self):\n        return self.slots[:self.size]\n\ndef erase_at(values, i):\n    # In-place stable deletion, without using a built-in deletion operation.\n    if not 0 <= i < len(values):\n        raise IndexError(i)\n    removed = values[i]\n    for j in range(i, len(values) - 1):\n        values[j] = values[j + 1]\n    values.pop()\n    return removed\n\nif __name__ == '__main__':\n    a = IntArray()\n    for x in [10, 20, 30]: a.append(x)\n    a.insert(1, 15)\n    assert a.erase(2) == 20\n    assert a.values() == [10, 15, 30]\n",
+    "cpp": "#include <vector>\n#include <stdexcept>\n#include <cassert>\nusing namespace std;\n// vector's length models allocated slots; n is the separate logical size.\nclass IntArray {\n    vector<int> slots;\n    int n = 0;\npublic:\n    int size() const { return n; }\n    int capacity() const { return static_cast<int>(slots.size()); }\n    void insert(int i, int value) {\n        if (i < 0 || i > n) throw out_of_range(\"index\");\n        if (n == capacity()) {\n            vector<int> grown(n == 0 ? 1 : 2 * n);\n            for (int j = 0; j < n; ++j) grown[j] = slots[j];\n            slots.swap(grown);\n        }\n        for (int j = n; j > i; --j) slots[j] = slots[j - 1];\n        slots[i] = value; ++n;\n    }\n    void append(int value) { insert(n, value); }\n    int get(int i) const {\n        if (i < 0 || i >= n) throw out_of_range(\"index\");\n        return slots[i];\n    }\n    void set(int i, int value) { get(i); slots[i] = value; }\n    int erase(int i) {\n        int result = get(i);\n        for (int j = i; j < n - 1; ++j) slots[j] = slots[j + 1];\n        slots[--n] = 0;\n        return result;\n    }\n    vector<int> values() const { return vector<int>(slots.begin(), slots.begin() + n); }\n};\nint erase_at(vector<int>& values, int i) {\n    if (i < 0 || i >= static_cast<int>(values.size())) throw out_of_range(\"index\");\n    int removed = values[i];\n    for (int j = i; j + 1 < static_cast<int>(values.size()); ++j) values[j] = values[j + 1];\n    values.pop_back(); return removed;\n}\nint main() {\n    IntArray a;\n    for (int x : {10, 20, 30}) a.append(x);\n    a.insert(1, 15); assert(a.erase(2) == 20);\n    assert(a.values() == vector<int>({10, 15, 30}));\n}\n",
+    "java": "import java.util.Arrays;\nclass ArrayDemo {\n    static class IntArray {\n        private int[] slots = new int[0];\n        private int size = 0;\n        void insert(int i, int value) {\n            if (i < 0 || i > size) throw new IndexOutOfBoundsException();\n            if (size == slots.length) {\n                int[] grown = new int[Math.max(1, 2 * slots.length)];\n                for (int j = 0; j < size; j++) grown[j] = slots[j];\n                slots = grown;\n            }\n            for (int j = size; j > i; j--) slots[j] = slots[j - 1];\n            slots[i] = value; size++;\n        }\n        void append(int value) { insert(size, value); }\n        int get(int i) {\n            if (i < 0 || i >= size) throw new IndexOutOfBoundsException();\n            return slots[i];\n        }\n        void set(int i, int value) { get(i); slots[i] = value; }\n        int erase(int i) {\n            int result = get(i);\n            for (int j = i; j < size - 1; j++) slots[j] = slots[j + 1];\n            slots[--size] = 0; return result;\n        }\n        int[] values() { return Arrays.copyOf(slots, size); }\n    }\n    public static void main(String[] args) {\n        IntArray a = new IntArray();\n        for (int x : new int[]{10, 20, 30}) a.append(x);\n        a.insert(1, 15);\n        if (a.erase(2) != 20 || !Arrays.equals(a.values(), new int[]{10,15,30})) throw new AssertionError();\n    }\n}\n",
+    "typescript": "class IntArray {\n  slots: (number | null)[];\n  size: number;\n  constructor() { this.slots = []; this.size = 0; }\n  insert(i: number, value: number) {\n    if (!Number.isInteger(i) || i < 0 || i > this.size) throw new RangeError(\"index\");\n    if (this.size === this.slots.length) {\n      const grown = new Array(Math.max(1, 2 * this.slots.length)).fill(null);\n      for (let j = 0; j < this.size; j++) grown[j] = this.slots[j];\n      this.slots = grown;\n    }\n    for (let j = this.size; j > i; j--) this.slots[j] = this.slots[j - 1];\n    this.slots[i] = value; this.size++;\n  }\n  append(value: number) { this.insert(this.size, value); }\n  get(i: number): number {\n    if (!Number.isInteger(i) || i < 0 || i >= this.size) throw new RangeError(\"index\");\n    return this.slots[i]!;\n  }\n  set(i: number, value: number) { this.get(i); this.slots[i] = value; }\n  erase(i: number) {\n    const result = this.get(i);\n    for (let j = i; j < this.size - 1; j++) this.slots[j] = this.slots[j + 1];\n    this.slots[--this.size] = null;\n    return result;\n  }\n  values() { return this.slots.slice(0, this.size); }\n}\nfunction eraseAt(values: number[], i: number) {\n  if (!Number.isInteger(i) || i < 0 || i >= values.length) throw new RangeError(\"index\");\n  const removed = values[i];\n  for (let j = i; j < values.length - 1; j++) values[j] = values[j + 1];\n  values.pop();\n  return removed;\n}\n",
+    "javascript": "class IntArray {\n  constructor() { this.slots = []; this.size = 0; }\n  insert(i, value) {\n    if (!Number.isInteger(i) || i < 0 || i > this.size) throw new RangeError(\"index\");\n    if (this.size === this.slots.length) {\n      const grown = new Array(Math.max(1, 2 * this.slots.length)).fill(null);\n      for (let j = 0; j < this.size; j++) grown[j] = this.slots[j];\n      this.slots = grown;\n    }\n    for (let j = this.size; j > i; j--) this.slots[j] = this.slots[j - 1];\n    this.slots[i] = value; this.size++;\n  }\n  append(value) { this.insert(this.size, value); }\n  get(i) {\n    if (!Number.isInteger(i) || i < 0 || i >= this.size) throw new RangeError(\"index\");\n    return this.slots[i];\n  }\n  set(i, value) { this.get(i); this.slots[i] = value; }\n  erase(i) {\n    const result = this.get(i);\n    for (let j = i; j < this.size - 1; j++) this.slots[j] = this.slots[j + 1];\n    this.slots[--this.size] = null;\n    return result;\n  }\n  values() { return this.slots.slice(0, this.size); }\n}\nfunction eraseAt(values, i) {\n  if (!Number.isInteger(i) || i < 0 || i >= values.length) throw new RangeError(\"index\");\n  const removed = values[i];\n  for (let j = i; j < values.length - 1; j++) values[j] = values[j + 1];\n  values.pop();\n  return removed;\n}\n"
+  },
+  "complexity": [
+    {
+      "operation": "Index read/write",
+      "time": "Θ(1)",
+      "space": "Θ(1) auxiliary",
+      "why": "Fixed-width slots support direct address calculation after bounds checking."
+    },
+    {
+      "operation": "Append without growth",
+      "time": "Θ(1)",
+      "space": "Θ(1) auxiliary",
+      "why": "One unused slot receives the value."
+    },
+    {
+      "operation": "Append with growth",
+      "time": "Θ(n) worst; O(1) amortized",
+      "space": "Θ(n) temporary during growth",
+      "why": "Copying n live entries is expensive, but geometric growth bounds total copies over a sequence."
+    },
+    {
+      "operation": "Stable insert at i",
+      "time": "Θ(n−i+1) without growth; O(n) worst",
+      "space": "Θ(1) without growth",
+      "why": "Move n−i old elements, then write the new value."
+    },
+    {
+      "operation": "Stable erase at i",
+      "time": "Θ(n−i)",
+      "space": "Θ(1) auxiliary",
+      "why": "Move n−i−1 successors left and clear the final slot; no shrinking in this model."
+    },
+    {
+      "operation": "Copied slice of length k",
+      "time": "Θ(k)",
+      "space": "Θ(k) output",
+      "why": "Every output slot must be written."
+    },
+    {
+      "operation": "Prefix sums",
+      "time": "Θ(n) build; Θ(1) range sum",
+      "space": "Θ(n) index storage",
+      "why": "Precompute cumulative totals, then subtract two boundaries."
+    }
+  ],
+  "quiz": [
+    {
+      "id": "size",
+      "type": "single",
+      "prompt": "An array has size 3 and capacity 8. Which indices can be read as elements?",
+      "options": [
+        "0 through 7",
+        "0 through 3",
+        "0 through 2",
+        "Only index 3"
+      ],
+      "answer": 2,
+      "explanation": "Capacity describes slots; size describes live elements.",
+      "dimension": "Recognize"
+    },
+    {
+      "id": "shift",
+      "type": "single",
+      "prompt": "For stable insertion into the middle, which direction preserves unread values?",
+      "options": [
+        "Left to right",
+        "Right to left",
+        "Either direction without temporary storage"
+      ],
+      "answer": 1,
+      "explanation": "Copy each source before a later move can overwrite it.",
+      "dimension": "Debug"
+    },
+    {
+      "id": "copy",
+      "type": "single",
+      "prompt": "Appending a fifth element to a full capacity-4 buffer copies how many old elements?",
+      "options": [
+        "0",
+        "1",
+        "4",
+        "8"
+      ],
+      "answer": 2,
+      "explanation": "All four live values are copied into the new capacity-8 allocation.",
+      "dimension": "Trace"
+    },
+    {
+      "id": "latency",
+      "type": "single",
+      "prompt": "Does amortized O(1) append guarantee constant latency for every call?",
+      "options": [
+        "Yes",
+        "No; a single growth can copy the entire live prefix"
+      ],
+      "answer": 1,
+      "explanation": "The guarantee applies to total work over a sequence.",
+      "dimension": "Analyze"
+    },
+    {
+      "id": "layout",
+      "type": "single",
+      "prompt": "Which statement is accurate for the teaching comparison?",
+      "options": [
+        "CPython lists inline every integer object",
+        "Packed C++ vector<int> elements are contiguous",
+        "Every linked node necessarily has its own cache line",
+        "JavaScript Arrays always use the exact shown addresses"
+      ],
+      "answer": 1,
+      "explanation": "Contiguous slots and contiguous referenced objects are different claims.",
+      "dimension": "Compare"
+    },
+    {
+      "id": "range",
+      "type": "single",
+      "prompt": "With P[0]=0 and P[i+1]=P[i]+a[i], the sum over [l,r) is:",
+      "options": [
+        "P[r]−P[l]",
+        "P[r−1]−P[l]",
+        "P[r]+P[l]",
+        "P[l]−P[r]"
+      ],
+      "answer": 0,
+      "explanation": "Subtract the sum before l from the sum before r; this also handles an empty range.",
+      "dimension": "Apply"
+    },
+    {
+      "id": "sequence-guarantees",
+      "type": "multiple",
+      "prompt": "Which claims hold for the dynamic-array model in this lesson?",
+      "options": [
+        "Only the live prefix contains sequence elements",
+        "Every append performs only one write",
+        "Stable middle deletion shifts successors",
+        "Growth can invalidate a pointer into the old backing buffer"
+      ],
+      "answer": [
+        0,
+        2,
+        3
+      ],
+      "explanation": "Logical size bounds elements, stable deletion shifts, and growth changes allocation. A growth-triggering append copies existing elements as well as writing the new value.",
+      "dimension": "Explain"
+    }
+  ],
+  "problems": [
+    {
+      "id": "stable-array-erasure",
+      "title": "Remove an element while preserving order",
+      "difficulty": "Easy",
+      "topics": [
+        "arrays"
+      ],
+      "prerequisites": [
+        "algorithmic-thinking",
+        "complexity"
+      ],
+      "patterns": [],
+      "statement": "Implement erase_at(values, i) in Python/C++, or eraseAt(values, i) in JavaScript. Mutate the sequence by removing the element at valid index i, preserve the order of the others, and return the removed value. Practice explicit shifting; use pop/pop_back only to remove the final slot, not a built-in middle deletion.",
+      "constraints": [
+        "1 ≤ n ≤ 10,000",
+        "0 ≤ i < n",
+        "Integer elements; duplicates allowed"
+      ],
+      "examples": [
+        "[10,20,30], i=1 → returns 20, sequence becomes [10,30]",
+        "[7], i=0 → returns 7, sequence becomes []"
+      ],
+      "hints": [
+        "After saving the removed value, which element should occupy index i?",
+        "Move successors left in increasing index order to preserve their values.",
+        "After shifting, remove the duplicated final slot."
+      ],
+      "starter": {
+        "python": "def erase_at(values, i):\n    return 0\n",
+        "javascript": "function eraseAt(values, i) { return 0; }\n",
+        "cpp": "int erase_at(vector<int>& values, int i) { return 0; }\n"
+      },
+      "tests": {
+        "python": "a=[10,20,30]\n__check('returned',erase_at(a,1),20)\n__check('stable',a,[10,30])\nb=[7]\n__check('singleton return',erase_at(b,0),7)\n__check('empty result',b,[])\nc=[2,2,3,4]\nerase_at(c,0)\n__check('front and duplicates',c,[2,3,4])\n__check('last return',erase_at(c,2),4)\n__check('last result',c,[2,3])",
+        "javascript": "let a=[10,20,30]; __check('returned',eraseAt(a,1),20); __check('stable',a,[10,30]);\nlet b=[7]; __check('singleton return',eraseAt(b,0),7); __check('empty result',b,[]);\nlet c=[2,2,3,4]; eraseAt(c,0); __check('front and duplicates',c,[2,3,4]);\n__check('last return',eraseAt(c,2),4); __check('last result',c,[2,3]);",
+        "cpp": "int main() {\nvector<int> a{10,20,30}; __check(\"returned\",erase_at(a,1),20); __check(\"stable\",a,vector<int>{10,30});\nvector<int> b{7}; __check(\"singleton return\",erase_at(b,0),7); __check(\"empty result\",b,vector<int>{});\nvector<int> c{2,2,3,4}; erase_at(c,0); __check(\"front\",c,vector<int>{2,3,4});\n__check(\"last return\",erase_at(c,2),4); __check(\"last result\",c,vector<int>{2,3});\nreturn 0;\n}\n"
+      },
+      "solution": {
+        "Naive approach": "Build a new sequence containing all indices except i, then copy it back. This uses linear additional storage.",
+        "Insight": "The gap can be closed using the existing buffer because each successor moves exactly one slot left.",
+        "Algorithm": "Save values[i]. Shift j=i through n−2 from values[j+1]. Pop the final slot and return the saved value.",
+        "Correctness": "After processing j, the prefix through j equals the original sequence with the target position removed. Unread successors remain intact because shifting proceeds left to right.",
+        "Complexity": "Θ(n−i) time and Θ(1) auxiliary space; output sequence is one element shorter.",
+        "Alternatives": "Swap with the last element for O(1) deletion only when preserving order is not required.",
+        "Common mistakes": "Shifting right to left, forgetting the final pop, returning the overwritten value, or swapping with the last despite the stability contract."
+      }
+    }
+  ],
+  "resources": [
+    "ods-arrays"
+  ],
+  "trace": {
+    "kind": "dynamic-array",
+    "input": {
+      "values": [
+        10,
+        20,
+        30,
+        40,
+        50
+      ],
+      "capacity": 0
+    }
+  }
+}

@@ -18,6 +18,83 @@
       frames.push(freeze(copy({ line, explanation, variables, stack, memory, counters, view, ...(prediction ? { prediction } : {}) })));
     }, finish(result) { return freeze({ frames, pseudocode, result }); } };
   }
+  function linear(input) {
+    const { values, target } = input;
+    numbers(values, 128); requireInput(number(target), 'Target must be a finite number.');
+    const t = recorder(['i = 0', 'while i < n:', '    if a[i] == target: return i', '    i = i + 1', 'return -1']);
+    let i = 0, comparisons = 0;
+    const frame = (line, explanation, result = null, prediction) => t.add(line, explanation,
+      { i, target, excludedPrefix: `[0, ${i})` },
+      { kind: 'array', values, low: i, high: values.length, active: i < values.length ? [i] : [], result },
+      { comparisons }, [], [{ label: 'Input is read-only; one index is auxiliary storage', cells: values }], prediction);
+    frame(0, 'Initially the examined prefix is empty. No earlier match has been skipped.');
+    while (i < values.length) {
+      frame(1, 'Every index before i has been checked and differs from the target.', null,
+        { prompt: 'Does this comparison return the first match?', options: ['Return i', 'Continue scanning'], answer: values[i] === target ? 0 : 1, explanation: 'Return only on equality. All earlier positions are already excluded.' });
+      comparisons++;
+      frame(2, values[i] === target ? 'Equality found; the invariant proves this is the first occurrence.' : 'This element is not the target.', values[i] === target ? i : null);
+      if (values[i] === target) return t.finish(i);
+      i++; frame(3, 'Extend the excluded prefix by one. The remaining length strictly decreases.');
+    }
+    frame(4, 'Every element has been excluded, so return the absence sentinel.', -1);
+    return t.finish(-1);
+  }
+  function counting(input) {
+    const { n, mode = 'triangular' } = input;
+    requireInput(Number.isInteger(n) && n >= 0 && n <= 48, 'n must be an integer between 0 and 48.');
+    requireInput(['linear', 'triangular', 'doubling'].includes(mode), 'Use linear, triangular or doubling mode.');
+    const code = mode === 'triangular' ? ['count = 0', 'for i = 0 .. n-1:', '    for j = 0 .. i-1: count += 1', 'return count'] :
+      mode === 'linear' ? ['count = 0', 'for i = 0 .. n-1:', '    count += 1', 'return count'] :
+      ['count = 0; i = 1', 'while i < n:', '    count += 1; i *= 2', 'return count'];
+    const t = recorder(code), values = Array(n).fill(0);
+    let count = 0;
+    const frame = (line, i, j, text) => t.add(line, text, { n, i, j, mode, count },
+      { kind: 'array', values, low: 0, high: n, active: i < n ? [i] : [], result: line === 3 ? count : null },
+      { bodyExecutions: count }, [], [{ label: 'Bar values record visits by outer index. The algorithm itself only needs scalar counters.' }]);
+    frame(0, 0, null, 'Count body executions, not elapsed time or every machine instruction.');
+    if (mode === 'doubling') {
+      for (let i = 1; i < n; i *= 2) {
+        frame(1, i, null, 'The next index doubles rather than increasing by one.');
+        values[i]++; count++; frame(2, i, null, 'After k executions the next index is 2^k.');
+      }
+    } else for (let i = 0; i < n; i++) {
+      frame(1, i, null, mode === 'triangular' ? `This row has ${i} inner iterations, not n.` : 'One body execution per input element.');
+      for (let j = 0; j < (mode === 'linear' ? 1 : i); j++) {
+        values[i]++; count++; frame(2, i, j, mode === 'triangular' ? 'One ordered index pair with j < i has been counted.' : 'Count one body execution.');
+      }
+    }
+    frame(3, n, null, 'Compare the measured count with n, n(n−1)/2, or ceil(log₂ n) (zero for n ≤ 1).');
+    return t.finish(count);
+  }
+  function dynamicArray(input) {
+    const { values, capacity: initialCapacity = 0 } = input;
+    numbers(values, 48);
+    requireInput(Number.isInteger(initialCapacity) && initialCapacity >= 0 && initialCapacity <= 64, 'Initial capacity must be an integer from 0 to 64.');
+    const t = recorder(['size = 0; allocate capacity slots', 'for value in input:', '    if size == capacity: allocate max(1, 2*capacity) slots', '        copy each live element to the new buffer', '        replace the buffer; release the old buffer', '    buffer[size] = value; size += 1', 'return live prefix']);
+    let buffer = Array(initialCapacity).fill(null), size = 0, copies = 0, writes = 0, allocations = initialCapacity ? 1 : 0, serial = 1;
+    let pending = null;
+    const frame = (line, explanation, active = [], prediction) => t.add(line, explanation,
+      { size, capacity: buffer.length, nextCapacity: pending?.length ?? null, buffer: `allocation-${serial}` },
+      { kind: 'array', values: buffer, low: 0, high: size, intervalLabel: 'Live prefix', outsideLabel: 'spare capacity', active, result: line === 6 ? buffer.slice(0, size) : null },
+      { copies, writes, allocations, liveSlots: size, allocatedSlots: buffer.length + (pending?.length || 0) }, [],
+      [{ label: `allocation-${serial}: null denotes an unused slot, not an element`, cells: buffer },
+        ...(pending ? [{ label: 'New allocation being copied; both buffers coexist', cells: pending }] : [])], prediction);
+    frame(0, 'Size counts live elements; capacity counts allocated slots.');
+    for (const value of values) {
+      frame(1, `Append ${value}.`, [], { prompt: 'Does this append require a new allocation?', options: ['Yes, size equals capacity', 'No, a spare slot exists'], answer: size === buffer.length ? 0 : 1, explanation: 'Only a full buffer triggers growth; an unused slot is not a logical element.' });
+      if (size === buffer.length) {
+        pending = Array(Math.max(1, 2 * buffer.length)).fill(null); allocations++;
+        frame(2, 'Allocate a geometrically larger buffer. Existing references still point to the old buffer.');
+        for (let i = 0; i < size; i++) { pending[i] = buffer[i]; copies++; writes++; frame(3, `Copy live index ${i}; unused slots are not elements.`, [i]); }
+        buffer = pending; pending = null; serial++;
+        frame(4, 'Publish the new buffer. Pointers into the old allocation are invalidated in this model.');
+      }
+      buffer[size++] = value; writes++;
+      frame(5, 'Write one new element, then increase size. The live prefix invariant is restored.', [size - 1]);
+    }
+    frame(6, 'All appends complete. Copy counts show amortized work; a single growing append can still be linear.');
+    return t.finish(buffer.slice(0, size));
+  }
   function binary(input) {
     const { values, target, mode = 'exact' } = input;
     numbers(values, 128); requireInput(number(target), 'Target must be a finite number.');
@@ -158,12 +235,15 @@
     return t.finish({ value: rows[items.length][capacity], chosen, weight: chosen.reduce((sum, i) => sum + items[i].weight, 0) });
   }
   const defaults = freeze({
+    'linear-search': { values: [8, 3, 5, 3, 9], target: 3 },
+    'operation-count': { n: 6, mode: 'triangular' },
+    'dynamic-array': { values: [10, 20, 30, 40, 50], capacity: 0 },
     'binary-search': { values: [1, 3, 3, 5, 8, 13, 21], target: 3, mode: 'lower_bound' },
     'avl-tree': { values: [30, 10, 20, 40, 50, 25], delete: [10] },
     dijkstra: { nodes: ['A', 'B', 'C', 'D', 'E'], source: 'A', edges: [{ from: 'A', to: 'B', weight: 4 }, { from: 'A', to: 'C', weight: 1 }, { from: 'C', to: 'B', weight: 2 }, { from: 'B', to: 'D', weight: 1 }, { from: 'C', to: 'D', weight: 5 }] },
     knapsack: { items: [{ weight: 2, value: 3 }, { weight: 3, value: 4 }, { weight: 4, value: 5 }, { weight: 5, value: 8 }], capacity: 7 }
   });
-  const generators = { 'binary-search': binary, 'avl-tree': avl, dijkstra, knapsack };
+  const generators = { 'linear-search': linear, 'operation-count': counting, 'dynamic-array': dynamicArray, 'binary-search': binary, 'avl-tree': avl, dijkstra, knapsack };
   global.DSATraces = Object.freeze({ defaults, generate(kind, input) {
     requireInput(Object.prototype.hasOwnProperty.call(generators, kind), 'Unknown teaching trace.');
     requireInput(input === undefined || (input !== null && typeof input === 'object' && !Array.isArray(input)), 'Trace input must be an object.');

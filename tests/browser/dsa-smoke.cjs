@@ -11,7 +11,7 @@ const extras={ 'avl-tree': 'function isBalanced(n){function h(n){if(!n)return 0;
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base+'/tracks/dsa.html');
  await page.getByRole('heading',{name:'Your learning workspace'}).waitFor();
- for(const id of ['binary-search','avl-tree','dijkstra','knapsack']){
+ for(const id of ['binary-search','avl-tree','dijkstra','knapsack','algorithmic-thinking','complexity','arrays']){
   await page.goto(base+'/tracks/dsa.html#topic/'+id);
   await page.locator('[data-position]').waitFor();
   console.log(id,await page.locator('[data-position]').textContent());
@@ -30,16 +30,46 @@ const extras={ 'avl-tree': 'function isBalanced(n){function h(n){if(!n)return 0;
   const oldEvidence=await page.evaluate(()=>DSAStore.mastery(location.hash.split('/')[1]).Implement.passed);
   assert.ok(oldEvidence>0,'passing implementation creates mastery evidence');
   await page.getByRole('button',{name:'Mark lesson complete',exact:true}).click();
-  const completed=await page.evaluate(id=>Progress.isDone(id),id);assert.equal(completed,true);
+  const completionId=({arrays:'dsa-1-2',complexity:'dsa-1-1'})[id]||id;
+  const completed=await page.evaluate(id=>Progress.isDone(id),completionId);assert.equal(completed,true);
+  const multi=content(id).quiz.find(question=>question.type==='multiple');
+  if(multi) {
+   const field=page.locator('[data-question-id="'+multi.id+'"]');
+   await field.locator('input').nth(multi.answer[0]).check();
+   await field.locator('[data-check]').click();
+   assert.ok((await field.locator('[data-quiz-feedback]').textContent()).startsWith('Not quite.'));
+   await page.reload(); await page.locator('[data-position]').waitFor();
+   for(const index of multi.answer)await field.locator('input').nth(index).check();
+   await field.locator('[data-check]').click();
+   assert.ok((await field.locator('[data-quiz-feedback]').textContent()).startsWith('Correct.'));
+   assert.equal(await page.getByRole('button',{name:'Mark incomplete',exact:true}).count(),1,'completion survives reload');
+  }
   await page.locator('[data-question]').fill('What invariant is maintained?');
   await page.getByRole('button',{name:'Ask',exact:true}).click();
   await page.locator('[data-provider]').getByText('Local guided response — no AI model used',{exact:true}).waitFor();
  }
- for(const name of ['curriculum','paths','patterns','practice','lab','complexity','memory','resources','library','graph','notes']){
+ for(const name of ['curriculum','paths','patterns','practice','compare','lab','complexity','memory','resources','library','graph','notes']){
   await page.goto(base+'/tracks/dsa.html#'+name);
   await page.locator('#dsa-root h2').first().waitFor();
   assert.equal(await page.getByText('Unable to load this view',{exact:true}).count(),0,name);
   console.log('route',name);
+ }
+ await page.goto(base+'/tracks/dsa.html#curriculum');
+ await page.locator('[data-search]').fill('Binary Indexed Tree');
+ await page.getByRole('link',{name:'Fenwick Tree',exact:true}).waitFor({state:'visible'});
+ await page.locator('[data-search]').fill('Gomory');
+ assert.equal(await page.getByRole('link',{name:'Gomory–Hu Tree',exact:true}).count(),2,'cross-listed canonical topic');
+ await page.goto(base+'/tracks/dsa.html#compare/array-list');
+ await page.locator('[data-comparison-body] table').waitFor();
+ assert.ok((await page.locator('[data-comparison-body]').textContent()).includes('finding it can be Θ(n)'));
+ await page.locator('[data-comparison]').selectOption('fenwick-segment');
+ assert.ok(page.url().endsWith('#compare/fenwick-segment'));
+ for(const id of ['algorithmic-thinking','complexity','arrays']) {
+  await page.goto(base+'/tracks/dsa.html#lab');
+  await page.locator('[data-alg]').selectOption(id);
+  await page.locator('[data-position]').waitFor();
+  assert.equal(await page.locator('[data-input-error]').textContent(),'');
+  await page.getByRole('button',{name:'Next',exact:true}).click();
  }
  await page.goto(base+'/tracks/dsa.html#resources');
  await page.getByRole('button',{name:'Save to library',exact:true}).first().click();
@@ -52,6 +82,12 @@ const extras={ 'avl-tree': 'function isBalanced(n){function h(n){if(!n)return 0;
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+2);
  await page.screenshot({path:process.env.DSA_SCREENSHOT || '/tmp/dsa-mobile.png',fullPage:true});
  assert.equal(overflow,false,'mobile horizontal overflow');
+ for(const hash of ['topic/arrays','compare/array-list','curriculum']) {
+  await page.goto(base+'/tracks/dsa.html#'+hash);
+  await page.locator('#dsa-root h2').first().waitFor();
+  if(hash==='topic/arrays')await page.locator('[data-position]').waitFor();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+2),false,'mobile overflow: '+hash);
+ }
  assert.deepEqual(errors,[]);
  console.log('PASS browser routes, traces, predictions, drafts, tutor, library, notes, mobile; no JS errors');
  await browser.close();

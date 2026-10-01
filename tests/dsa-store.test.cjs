@@ -112,3 +112,18 @@ test('self reports are labeled, histories bounded, and old evidence keys migrate
   assert.equal(store.read().activity.length,100);
   assert.throws(()=>store.record('arrays','Trace','q','false'));
 });
+
+test('selected path prioritizes its missing ancestors without skipping prerequisites', () => {
+  const {store} = setup();
+  const topics = [
+    {id:'unrelated',status:'published',prerequisites:[]},
+    {id:'basics',status:'published',prerequisites:[]},
+    {id:'intermediate',status:'published',prerequisites:['basics']},
+    {id:'advanced',status:'planned',prerequisites:['intermediate']},
+  ];
+  const catalog={topics,paths:[{id:'advanced-path',topics:['advanced']}]};
+  store.path('advanced-path');
+  assert.deepEqual(Array.from(store.recommendations(catalog,()=>false),t=>t.id),['basics','unrelated']);
+  assert.deepEqual(Array.from(store.recommendations(catalog,id=>id==='basics'),t=>t.id),['intermediate','unrelated']);
+  assert.equal(store.mastery('advanced').Explain.score,null);
+});

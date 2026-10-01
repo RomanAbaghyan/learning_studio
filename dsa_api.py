@@ -86,6 +86,8 @@ class ContentStore:
             for lesson in lessons.values():
                 if lesson["id"] not in topic_map:
                     raise ValueError("Lesson has no topic")
+                if topic_map[lesson["id"]].get("status") == "published":
+                    self.validate_lesson(lesson)
             resource_map = self.index(catalog.get("resources", []), "resource")
             for lesson in lessons.values():
                 for resource_id in lesson.get("resources", []):
@@ -94,6 +96,7 @@ class ContentStore:
             self.index(self.all_problems(catalog, lessons), "problem")
             for key in ("resources", "problems", "paths"):
                 self.index(catalog.get(key, []), key)
+            self.validate_references(catalog, topic_map, lessons)
             self._data = catalog, lessons
             return self._data
         except (OSError, ValueError, KeyError, TypeError, AttributeError, RecursionError):
@@ -142,6 +145,91 @@ class ContentStore:
 
         for identifier in topics:
             visit(identifier)
+
+    @classmethod
+    def validate_lesson(cls, lesson: dict):
+        """Reject published content that the shared reader cannot present."""
+        def strings(values):
+            return isinstance(values, list) and bool(values) and all(isinstance(value, str) and value.strip() for value in values)
+
+        if not all(isinstance(lesson.get(key), str) and lesson[key].strip() for key in ("title", "summary", "pseudocode")) or not strings(lesson.get("objectives")):
+            raise ValueError("Published lesson missing explanatory content")
+        sections = cls.index(lesson.get("sections", []), "section")
+        if not sections or any(not item.get("title") or not isinstance(item.get("body"), str) or not item["body"].strip() for item in sections.values()):
+            raise ValueError("Published lesson missing sections")
+        implementations = lesson.get("implementations")
+        if not isinstance(implementations, dict) or not all(isinstance(implementations.get(language), str) and implementations[language].strip() for language in ("python", "cpp")):
+            raise ValueError("Published lesson requires Python and C++ implementations")
+        trace = lesson.get("trace", {})
+        if not isinstance(trace.get("kind"), str) or not IDENTIFIER.fullmatch(trace["kind"]) or not isinstance(trace.get("input"), dict):
+            raise ValueError("Published lesson missing trace configuration")
+        rows = lesson.get("complexity")
+        if not isinstance(rows, list) or not rows or any(not all(isinstance(row.get(key), str) and row[key].strip() for key in ("operation", "time", "space", "why")) for row in rows):
+            raise ValueError("Published lesson missing complexity reasoning")
+        questions = cls.index(lesson.get("quiz", []), "question")
+        dimensions = {"Recognize", "Explain", "Trace", "Implement", "Debug", "Analyze", "Apply", "Compare", "Prove", "Optimize"}
+        if not questions:
+            raise ValueError("Published lesson missing assessment")
+        for question in questions.values():
+            if not question.get("prompt") or not question.get("explanation") or question.get("dimension", "Explain") not in dimensions:
+                raise ValueError("Invalid assessment metadata")
+            options, answer = question.get("options"), question.get("answer")
+            if not strings(options) or len(options) < 2:
+                raise ValueError("Assessment requires options")
+            answers = answer if question.get("type") == "multiple" else [answer]
+            if question.get("type", "single") not in {"single", "multiple"} or not isinstance(answers, list) or not answers or any(type(value) is not int or not 0 <= value < len(options) for value in answers) or len(set(answers)) != len(answers):
+                raise ValueError("Invalid assessment answer")
+        problems = cls.index(lesson.get("problems", []), "problem")
+        if not problems:
+            raise ValueError("Published lesson missing practice")
+        for problem in problems.values():
+            if not problem.get("statement") or not strings(problem.get("hints")) or not strings(problem.get("examples")) or not isinstance(problem.get("solution"), dict) or not problem["solution"]:
+                raise ValueError("Problem missing reasoning or hints")
+            starter, tests = problem.get("starter"), problem.get("tests")
+            if not isinstance(starter, dict) or not starter or not isinstance(tests, dict):
+                raise ValueError("Problem missing runnable contract")
+            if any(language not in {"python", "cpp", "javascript"} or not isinstance(code, str) or not code.strip() or not isinstance(tests.get(language), str) or not tests[language].strip() for language, code in starter.items()):
+                raise ValueError("Unsupported practice language or missing tests")
+
+    @classmethod
+    def validate_references(cls, catalog: dict, topics: dict, lessons: dict):
+        """Validate navigation edges as carefully as prerequisite edges."""
+        def refs(item, field, known):
+            values = item.get(field, [])
+            if not isinstance(values, list) or any(not isinstance(value, str) or value not in known for value in values):
+                raise ValueError(f"Invalid {field} references")
+            if len(values) != len(set(values)):
+                raise ValueError(f"Duplicate {field} references")
+
+        categories = cls.index(catalog.get("categories", []), "category")
+        for category in categories.values():
+            parent = category.get("parent")
+            if parent is not None and (not isinstance(parent, str) or parent not in categories):
+                raise ValueError("Unknown category parent")
+        cls.validate_dag({key: {"prerequisites": [item["parent"]] if item.get("parent") else []}
+                          for key, item in categories.items()})
+        for item in topics.values():
+            if "category" in item and item["category"] not in categories:
+                raise ValueError("Unknown topic category")
+            refs(item, "prerequisites", topics)
+            refs(item, "related", topics)
+            refs(item, "categories", categories)
+        for collection in ("resources", "paths", "patterns"):
+            cls.index(catalog.get(collection, []), collection)
+            for item in catalog.get(collection, []):
+                refs(item, "topics", topics)
+                refs(item, "prerequisites", topics)
+        for problem in cls.all_problems(catalog, lessons):
+            refs(problem, "topics", topics)
+            refs(problem, "prerequisites", topics)
+            refs(problem, "lessons", lessons)
+        for item in cls.index(catalog.get("comparisons", []), "comparison").values():
+            refs(item, "topics", topics)
+            if len(item.get("topics", [])) != 2 or not item.get("rows") or not item.get("guidance"):
+                raise ValueError("Comparison requires two topics, rows and guidance")
+            for row in item["rows"]:
+                if not isinstance(row.get("label"), str) or not isinstance(row.get("values"), list) or len(row["values"]) != 2 or not all(isinstance(value, str) and value for value in row["values"]):
+                    raise ValueError("Invalid comparison row")
 
     def lesson(self, slug: str) -> dict:
         if not IDENTIFIER.fullmatch(slug):

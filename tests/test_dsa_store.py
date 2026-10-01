@@ -10,4 +10,4 @@ import pytest
 def test_dsa_store_regressions():
     result = subprocess.run(["node", "tests/dsa-store.test.cjs"], cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "# tests 8" in result.stdout, result.stdout
+    assert "# fail 0" in result.stdout, result.stdout

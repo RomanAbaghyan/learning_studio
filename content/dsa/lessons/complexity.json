@@ -1,0 +1,292 @@
+{
+  "id": "complexity",
+  "title": "Complexity: Counts, Bounds and Cost Models",
+  "summary": "Derive asymptotic bounds from exact work, separate different kinds of guarantees, and connect mathematical growth to real machines.",
+  "objectives": [
+    "Count dependent loops using summations",
+    "Distinguish O, Ω, Θ, o and ω with quantified definitions",
+    "Separate worst-case, expected and amortized guarantees",
+    "Analyze auxiliary space, recursion and multiple input parameters",
+    "Explain where a machine cost model breaks down"
+  ],
+  "sections": [
+    {
+      "id": "motivation",
+      "title": "Why this matters: estimate before running",
+      "body": "A program taking one millisecond on ten inputs may still be unusable on a million. Complexity analysis asks how resource usage scales with a clearly defined input size. It helps reject infeasible approaches before implementation and explains why an optimization works. It does not predict a universal number of seconds: instruction costs, input distributions, memory layout and hardware still matter."
+    },
+    {
+      "id": "intuition",
+      "title": "Intuition: count the repeated work",
+      "body": "Choose an operation relevant to the algorithm: equality tests in search, edge relaxations in shortest paths, or live states in a DP. Then ask how many times it can occur. For linear search on n elements, absence takes n comparisons. A target at zero-based index p takes p+1. These are exact counts for one operation, not the total number of CPU instructions. A cost model makes that distinction explicit."
+    },
+    {
+      "id": "model",
+      "title": "Define size and a model of computation",
+      "body": "For an array, n may mean the number of elements; for a graph, both V and E matter; for a numeric problem, distinguish an integer U from its bit length b=⌈log₂(U+1)⌉. An O(U) algorithm can be exponential in b. Under a word-RAM model, reading a word, indexing an array and arithmetic on word-sized integers are constant-cost abstractions. Arbitrary-precision multiplication, variable-length string comparison, disk reads and network calls do not automatically satisfy that model.\n\nDeclare whether space means total storage or auxiliary storage beyond input and output. An in-place loop can use O(1) auxiliary words while its input occupies Θ(n). A function returning n values necessarily writes Θ(n) output, even if intermediate working memory is constant."
+    },
+    {
+      "id": "linear",
+      "title": "Exact counts before bounds",
+      "body": "A loop i=0,...,n−1 performs its body n times; the condition is tested n+1 times. A complete implementation can have cost an+b under a chosen unit-cost model. If two consecutive loops each scan n elements, the count is 2n, not n². A nested n-by-m loop performs nm inner bodies. Name both input parameters instead of replacing m with n without justification."
+    },
+    {
+      "id": "dependent",
+      "title": "Dependent loops require a sum",
+      "body": "For i=0,...,n−1 and j=0,...,i−1, row i contains i inner iterations. The total is 0+1+...+(n−1)=n(n−1)/2. Pair terms from opposite ends: each pair sums to n−1, giving n copies of that value divided by two. Equivalently, every unordered pair of distinct indices appears once as j<i. The result is Θ(n²), although the exact count is roughly half an n-by-n loop. For n=6 the rows have 0,1,2,3,4,5 iterations, totaling 15.\n\nNested syntax alone does not imply quadratic time. If an inner pointer never resets and advances at most n times across all outer iterations, total pointer movement can be O(n). Conversely, a single library call inside a loop can hide linear work and make the total quadratic."
+    },
+    {
+      "id": "logarithms",
+      "title": "Halving, doubling and logarithms",
+      "body": "If an integer index starts at 1 and doubles while i<n, after k executions its value is 2^k. The smallest k with 2^k≥n is ⌈log₂ n⌉ for n≥1; for n=0 the loop also executes zero times. Binary search reaches the same growth through halving an interval. The base of a logarithm changes by a constant factor, because log_a n = log_b n / log_b a. In asymptotic bounds constant bases are equivalent; in exact counts and information quantities the base still matters."
+    },
+    {
+      "id": "big-o",
+      "title": "Big-O is an eventual upper bound",
+      "body": "For eventually nonnegative functions f and g, f∈O(g) if there exist constants c>0 and n₀ such that f(n)≤c·g(n) for every n≥n₀. Constants cannot depend on n. For f(n)=3n+7, choose c=10 and n₀=1 to prove O(n). This also belongs to O(n²), a valid but loose bound. Saying “the algorithm is O(n²)” does not alone mean it needs quadratic work. First specify the cost function: worst-case time, expected time, or another quantity."
+    },
+    {
+      "id": "tight",
+      "title": "Ω and Θ: lower and tight bounds",
+      "body": "f∈Ω(g) means there are c>0,n₀ with f(n)≥c·g(n) eventually. f∈Θ(g) means both O(g) and Ω(g). Since 3n+7≥3n for n≥1, it is Ω(n), hence Θ(n). The triangular count n(n−1)/2 lies between n²/4 and n²/2 for n≥2, so it is Θ(n²).\n\nBig-O is not a synonym for worst case, and Ω is not a synonym for best case. Each bounds a function; that function may already represent best, worst or expected cost. A lower bound on one implementation also differs from a problem lower bound that applies to every algorithm in a stated computational model."
+    },
+    {
+      "id": "little",
+      "title": "Little-o and little-omega: strict asymptotic separation",
+      "body": "f∈o(g) means that for every c>0 there is n₀ with f(n)<c·g(n) for all n≥n₀. It eventually becomes smaller than every fixed positive fraction of g. For positive g, a limit f/g→0 is a convenient sufficient characterization when the limit exists. Thus n∈o(n log n), but 3n is not o(n). f∈ω(g) reverses the strict comparison: it eventually exceeds every constant multiple of g; n log n∈ω(n). These symbols express asymptotic separation, not small or large constants in a benchmark."
+    },
+    {
+      "id": "growth",
+      "title": "Growth families and practical consequences",
+      "body": "Constant work does not grow with n in the model. Logarithmic work repeatedly discards a fixed fraction. √n can arise from checking divisors through the square root. Linear work scans data once. n log n often combines logarithmic levels with linear work per level. n² and n³ often enumerate pairs and triples. 2^n enumerates subsets; n! enumerates permutations.\n\nDoubling n doubles linear work, roughly quadruples quadratic work and multiplies 2^n by another factor of 2^n. A constant improvement rarely rescues exhaustive search when n grows. Open the Complexity Lab to vary n and compare modeled growth with measured comparison counts. The graph uses a logarithmic vertical scale; equal visual distances represent multiplicative, not additive, differences."
+    },
+    {
+      "id": "cases",
+      "title": "Best, worst, average and expected are different claims",
+      "body": "For nonempty linear search, best case is one comparison and worst case is n. If the target is guaranteed present and uniformly distributed among n distinct positions, expected comparisons are (n+1)/2. Without that distribution there is no justified “average-case” number. Randomized quicksort can have expected O(n log n) under its random-pivot model while retaining an O(n²) worst case. An adversary, correlation or poor randomness may change the assumptions underlying an expectation."
+    },
+    {
+      "id": "amortized",
+      "title": "Amortized cost is about a sequence, not luck",
+      "body": "A dynamic array may copy n elements on one append. With capacity doubling, copies across m appends sum to 1+2+4+...<2m, plus m new writes. Total O(m) gives O(1) amortized append. No random input distribution is involved: the bound holds over every append sequence under the growth policy. It does not promise a low latency for each call. Aggregate, accounting and potential methods are three ways to distribute the same sequence-level work. Memory allocation or element-copy costs must still be included in the model."
+    },
+    {
+      "id": "recurrences",
+      "title": "Recursion trees and space",
+      "body": "A balanced merge sort recurrence T(n)=2T(n/2)+Θ(n) has Θ(log n) levels and Θ(n) merge work per level, yielding Θ(n log n) time. T(n)=T(n−1)+Θ(1) has Θ(n) depth and time. Peak stack space is the longest live call chain, not the total number of calls. A traversal can visit n nodes using O(h) recursive stack space in a tree of height h. A binary recursion tree may contain exponentially many calls but only linear stack depth when branches are processed sequentially. The Master Theorem applies to recurrences of a specific form; it is not a rule for every recursive program."
+    },
+    {
+      "id": "proof",
+      "title": "Prove a lower bound by indistinguishability",
+      "body": "Consider deterministic search on an unsorted sequence with an absent target. If the algorithm leaves one position unread, change only that position to the target. All observed values remain identical, so its execution cannot distinguish the absent and present inputs. It must therefore be wrong on one. Any always-correct algorithm needs n inspections on some input in this model. This justifies Θ(n) worst-case scanning without assuming that our implementation is the only possible one."
+    },
+    {
+      "id": "memory",
+      "title": "Memory, locality and measured performance",
+      "body": "Two Θ(n) scans can differ substantially: one reads packed integers sequentially, another follows pointers to scattered nodes. Cache lines, prefetching, branch prediction, allocation and runtime dispatch affect elapsed time. Measure representative distributions and sizes, separate setup from the operation, and report variance and warmup policy. A microbenchmark of one browser run is exploratory feedback, not a production latency guarantee. Maintain theoretical counters alongside timings so a fast machine does not hide a scaling problem."
+    },
+    {
+      "id": "mistakes",
+      "title": "Edge cases and common mistakes",
+      "body": "The logarithm of zero is undefined; define empty-input behavior separately or use log(n+1) when appropriate. A multiplication can overflow before assignment to a wider result type; widen operands first. The pair-count example restricts n≤1,000,000 and uses 64-bit arithmetic in C++/Java. JavaScript numbers exactly represent the resulting count within this bound. Python arbitrary-precision arithmetic removes fixed-width overflow, but its operation costs grow with bit length. Do not call a formula constant bit-complexity merely because it has one multiplication."
+    },
+    {
+      "id": "extensions",
+      "title": "Exercises and advanced extensions",
+      "body": "Derive the work in for i=1..n: for j=1..floor(n/i). It is a harmonic sum Θ(n log n). Show why appending to a linked list without a tail pointer n times takes Θ(n²). Compare an O(nW) knapsack algorithm in terms of numeric capacity W and the bits needed to encode W. Extend a timing experiment to include string comparison length. Research-level lower bounds require stating the model: comparison sorting, integer sorting and external-memory sorting have different allowable operations."
+    }
+  ],
+  "pseudocode": "count ← 0\nfor i ← 0 to n−1:\n    for j ← 0 to i−1:\n        count ← count + 1\nreturn count\n\nDerived equivalent: n × (n−1) / 2",
+  "implementations": {
+    "python": "def pair_count(n):\n    # Contract: 0 <= n <= 1_000_000; count pairs 0 <= j < i < n.\n    if not isinstance(n, int) or not 0 <= n <= 1_000_000:\n        raise ValueError(\"n outside contract\")\n    return n * (n - 1) // 2\n\ndef measured_pairs(n):\n    count = 0\n    for i in range(n):\n        for j in range(i):\n            count += 1\n    return count\n\nassert pair_count(6) == measured_pairs(6) == 15\n",
+    "cpp": "#include <cassert>\n#include <stdexcept>\nusing namespace std;\nlong long pair_count(long long n) {\n    if (n < 0 || n > 1000000) throw invalid_argument(\"n outside contract\");\n    return n * (n - 1) / 2; // multiplication occurs in 64 bits\n}\nlong long measured_pairs(int n) {\n    long long count = 0;\n    for (int i = 0; i < n; ++i)\n        for (int j = 0; j < i; ++j) ++count;\n    return count;\n}\nint main() { assert(pair_count(6) == 15); assert(measured_pairs(6) == 15); }\n",
+    "java": "class PairCount {\n    static long pairCount(long n) {\n        if (n < 0 || n > 1000000) throw new IllegalArgumentException(\"n outside contract\");\n        return n * (n - 1) / 2;\n    }\n    static long measuredPairs(int n) {\n        long count = 0;\n        for (int i = 0; i < n; i++)\n            for (int j = 0; j < i; j++) count++;\n        return count;\n    }\n    public static void main(String[] args) {\n        if (pairCount(6) != 15 || measuredPairs(6) != 15) throw new AssertionError();\n    }\n}\n",
+    "typescript": "function pairCount(n: number): number {\n  if (!Number.isInteger(n) || n < 0 || n > 1000000) throw new RangeError(\"n outside contract\");\n  return n * (n - 1) / 2;\n}\nfunction measuredPairs(n: number): number {\n  let count = 0;\n  for (let i = 0; i < n; i++)\n    for (let j = 0; j < i; j++) count++;\n  return count;\n}\nconsole.log(pairCount(6), measuredPairs(6)); // 15 15\n",
+    "javascript": "function pairCount(n) {\n  if (!Number.isInteger(n) || n < 0 || n > 1000000) throw new RangeError(\"n outside contract\");\n  return n * (n - 1) / 2;\n}\nfunction measuredPairs(n) {\n  let count = 0;\n  for (let i = 0; i < n; i++)\n    for (let j = 0; j < i; j++) count++;\n  return count;\n}\nconsole.log(pairCount(6), measuredPairs(6)); // 15 15\n"
+  },
+  "complexity": [
+    {
+      "operation": "Triangular nested loop",
+      "time": "Θ(n²)",
+      "space": "Θ(1) auxiliary words",
+      "why": "The exact body count is Σ i = n(n−1)/2; loop overhead does not change the tight bound."
+    },
+    {
+      "operation": "Pair-count formula",
+      "time": "Θ(1) word operations within stated limits",
+      "space": "Θ(1) words",
+      "why": "A fixed number of arithmetic operations replaces enumeration; arbitrary precision requires a bit-cost analysis."
+    },
+    {
+      "operation": "Doubling loop",
+      "time": "Θ(log(n+1)) for growing n",
+      "space": "Θ(1)",
+      "why": "After k updates the index is 2^k, so the loop stops when it reaches n."
+    },
+    {
+      "operation": "Repeated prefix slicing",
+      "time": "Θ(n²) copied elements",
+      "space": "O(n) peak if old slices are released",
+      "why": "The work sums n+(n−1)+...+1 even when slices are not simultaneously live."
+    }
+  ],
+  "quiz": [
+    {
+      "id": "tight",
+      "type": "single",
+      "prompt": "A cost is 3n+7. Which is its tight asymptotic bound?",
+      "options": [
+        "Θ(log n)",
+        "Θ(n)",
+        "Θ(n²)",
+        "Θ(1)"
+      ],
+      "answer": 1,
+      "explanation": "Upper and lower linear bounds hold for all sufficiently large n.",
+      "dimension": "Analyze"
+    },
+    {
+      "id": "upper",
+      "type": "single",
+      "prompt": "Does f∈O(n²) imply f∈Θ(n²)?",
+      "options": [
+        "Yes",
+        "No; a linear function also has a quadratic upper bound"
+      ],
+      "answer": 1,
+      "explanation": "An upper bound need not be tight.",
+      "dimension": "Recognize"
+    },
+    {
+      "id": "triangular",
+      "type": "single",
+      "prompt": "How many inner bodies run for n=5 with 0≤j<i<n?",
+      "options": [
+        "5",
+        "10",
+        "15",
+        "25"
+      ],
+      "answer": 1,
+      "explanation": "0+1+2+3+4=10; the upper limit depends on i.",
+      "dimension": "Trace"
+    },
+    {
+      "id": "amortized",
+      "type": "single",
+      "prompt": "What does O(1) amortized append guarantee?",
+      "options": [
+        "Every append has constant latency",
+        "O(m) total modeled work across m appends",
+        "Only random inputs are fast",
+        "No extra allocation"
+      ],
+      "answer": 1,
+      "explanation": "Amortized analysis bounds sequences and does not require a probability distribution.",
+      "dimension": "Explain"
+    },
+    {
+      "id": "little",
+      "type": "single",
+      "prompt": "Which statement is true?",
+      "options": [
+        "3n is o(n)",
+        "n is o(n log n)",
+        "n² is O(n)",
+        "Ω always means best case"
+      ],
+      "answer": 1,
+      "explanation": "The ratio 1/log n tends to zero.",
+      "dimension": "Analyze"
+    },
+    {
+      "id": "space",
+      "type": "single",
+      "prompt": "A depth-first recursive traversal visits n nodes in a balanced tree. Its peak call stack depends on:",
+      "options": [
+        "Total visited nodes only",
+        "Height of the longest live root-to-leaf chain",
+        "Number of edges squared",
+        "Output sorting"
+      ],
+      "answer": 1,
+      "explanation": "Frames on completed sibling branches have returned; depth controls live stack space.",
+      "dimension": "Analyze"
+    },
+    {
+      "id": "bound-meanings",
+      "type": "multiple",
+      "prompt": "Which asymptotic statements are true?",
+      "options": [
+        "3n+7 belongs to O(n²)",
+        "O always means worst-case time",
+        "n belongs to o(n log n)",
+        "Amortized bounds require random inputs"
+      ],
+      "answer": [
+        0,
+        2
+      ],
+      "explanation": "O(n²) is a valid loose upper bound and n/(n log n) tends to zero. O bounds a specified cost function; amortization concerns sequences, without a required input distribution.",
+      "dimension": "Analyze"
+    }
+  ],
+  "problems": [
+    {
+      "id": "count-index-pairs",
+      "title": "Count index pairs without enumerating them",
+      "difficulty": "Easy",
+      "topics": [
+        "complexity"
+      ],
+      "prerequisites": [
+        "algorithmic-thinking"
+      ],
+      "patterns": [],
+      "statement": "Implement pair_count(n) in Python/C++, or pairCount(n) in JavaScript. Return the number of pairs (j,i) satisfying 0 ≤ j < i < n, using a formula rather than enumerating pairs. Rejecting values outside the contract is optional for this exercise.",
+      "constraints": [
+        "Integer 0 ≤ n ≤ 1,000,000",
+        "The result may exceed 32-bit integer range"
+      ],
+      "examples": [
+        "n=0 → 0",
+        "n=5 → 10",
+        "n=1,000,000 → 499,999,500,000"
+      ],
+      "hints": [
+        "Count how many choices of j exist for each fixed i.",
+        "The row lengths are 0,1,...,n−1. Pair the first and last terms.",
+        "Compute n(n−1)/2 in an arithmetic type wide enough for the product."
+      ],
+      "starter": {
+        "python": "def pair_count(n):\n    return 0\n",
+        "javascript": "function pairCount(n) { return 0; }\n",
+        "cpp": "long long pair_count(long long n) { return 0; }\n"
+      },
+      "tests": {
+        "python": "__check('empty', pair_count(0), 0)\n__check('singleton', pair_count(1), 0)\n__check('five', pair_count(5), 10)\n__check('wide result', pair_count(1000000), 499999500000)",
+        "javascript": "__check('empty',pairCount(0),0);\n__check('singleton',pairCount(1),0);\n__check('five',pairCount(5),10);\n__check('wide result',pairCount(1000000),499999500000);",
+        "cpp": "int main() {\n__check(\"empty\",pair_count(0),0LL);\n__check(\"singleton\",pair_count(1),0LL);\n__check(\"five\",pair_count(5),10LL);\n__check(\"wide result\",pair_count(1000000),499999500000LL);\nreturn 0;\n}\n"
+      },
+      "solution": {
+        "Naive approach": "Visit every valid pair with nested loops, performing n(n−1)/2 increments.",
+        "Insight": "Only the number of pairs is required; their identities do not need to be materialized.",
+        "Algorithm": "Return n(n−1)/2, with sufficiently wide arithmetic.",
+        "Correctness": "Each two-element subset of indices has exactly one ordering j<i. The binomial count is n choose 2, which equals n(n−1)/2.",
+        "Complexity": "Constant word operations under the stated numeric bound; quadratic enumeration would be unnecessary. The public tests verify results, not an asymptotic complexity proof.",
+        "Alternatives": "Inductively sum 0 through n−1 in O(n) time, or use small exhaustive counts as a test oracle.",
+        "Common mistakes": "Using n², counting ordered pairs twice, or multiplying 32-bit values before widening."
+      }
+    }
+  ],
+  "resources": [
+    "mit-computation"
+  ],
+  "trace": {
+    "kind": "operation-count",
+    "input": {
+      "n": 6,
+      "mode": "triangular"
+    }
+  }
+}

@@ -11,6 +11,7 @@ import subprocess
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1] / 'content' / 'dsa'
+REFERENCE_LESSONS = ['binary-search', 'avl-tree', 'dijkstra', 'knapsack', 'algorithmic-thinking', 'complexity', 'arrays']
 
 
 def lesson(name):
@@ -116,7 +117,7 @@ def test_knapsack_matches_exhaustive_subsets_and_reconstructs_once():
             assert sum(items[i][1] for i in chosen) == value
 
 
-@pytest.mark.parametrize('name', ['binary-search', 'avl-tree', 'dijkstra', 'knapsack'])
+@pytest.mark.parametrize('name', REFERENCE_LESSONS)
 def test_javascript_examples_and_reference_problem_checks(name, tmp_path):
     if not shutil.which('node'):
         pytest.skip('node is unavailable')
@@ -134,7 +135,7 @@ def test_javascript_examples_and_reference_problem_checks(name, tmp_path):
     subprocess.run(['node', str(path)], check=True, capture_output=True, text=True, timeout=10)
 
 
-@pytest.mark.parametrize('name', ['binary-search', 'avl-tree', 'dijkstra', 'knapsack'])
+@pytest.mark.parametrize('name', REFERENCE_LESSONS)
 @pytest.mark.parametrize('language', ['cpp', 'java', 'typescript'])
 def test_compiled_reference_implementations(name, language, tmp_path):
     code = lesson(name)['implementations'][language]
@@ -163,7 +164,7 @@ def test_compiled_reference_implementations(name, language, tmp_path):
         subprocess.run(['node', str(tmp_path/'lesson.js')], check=True, capture_output=True, timeout=10)
 
 
-@pytest.mark.parametrize('name', ['binary-search', 'avl-tree', 'dijkstra', 'knapsack'])
+@pytest.mark.parametrize('name', REFERENCE_LESSONS)
 def test_cpp_exercise_harness_uses_existing_runner_protocol(name):
     import app
     if not app.CPP_COMPILER:
@@ -175,6 +176,8 @@ def test_cpp_exercise_harness_uses_existing_runner_protocol(name):
         'dijkstra': 'bool relax(vector<long long>&d,int u,int v,long long w){if(d[u]+w<d[v]){d[v]=d[u]+w;return true;}return false;}',
         'knapsack': 'int knapsack_value(const vector<pair<int,int>>&items,int capacity){vector<int>d(capacity+1);for(auto [w,v]:items)for(int c=capacity;c>=w;c--)d[c]=max(d[c],d[c-w]+v);return d[capacity];}',
     }
+    for new in ['algorithmic-thinking', 'complexity', 'arrays']:
+        sources[new] = lesson(new)['implementations']['cpp'].split('int main()')[0]
     for source, expected_pass in [(sources[name], True), (problem['starter']['cpp'], False)]:
         result = app._compile_and_run_cpp(source, problem['tests']['cpp'])
         assert not result.get('error'), result
@@ -182,7 +185,7 @@ def test_cpp_exercise_harness_uses_existing_runner_protocol(name):
         assert all(check['pass'] for check in result['results']) is expected_pass
 
 
-@pytest.mark.parametrize('name', ['binary-search', 'avl-tree', 'dijkstra', 'knapsack'])
+@pytest.mark.parametrize('name', REFERENCE_LESSONS)
 def test_python_exercise_harness_emits_real_checks(name):
     problem = lesson(name)['problems'][0]
     ns = implementation(name)
@@ -199,3 +202,61 @@ def test_python_exercise_harness_emits_real_checks(name):
         exec(problem['tests']['python'], env)
         assert len(checks) >= 3
         assert all(checks) is expected_pass
+
+
+def test_foundation_scan_matches_specification_without_mutating_input():
+    scan = implementation('algorithmic-thinking')['first_index']
+    rng = random.Random(981)
+    for n in range(40):
+        values = [rng.randrange(-3, 4) for _ in range(n)]
+        original = values[:]
+        for target in range(-4, 5):
+            matches = [i for i, value in enumerate(values) if value == target]
+            assert scan(values, target) == (min(matches) if matches else -1)
+            assert values == original
+
+
+def test_foundation_formula_matches_explicit_pairs_and_wide_result():
+    ns = implementation('complexity')
+    for n in range(35):
+        oracle = len([(a, b) for a in range(n) for b in range(n) if a < b])
+        assert ns['pair_count'](n) == ns['measured_pairs'](n) == oracle
+    assert ns['pair_count'](1_000_000) == 499_999_500_000
+    with pytest.raises(ValueError):
+        ns['pair_count'](-1)
+
+
+def test_dynamic_array_model_preserves_sequence_and_clears_removed_references():
+    ns = implementation('arrays')
+    model, expected = ns['IntArray'](), []
+    rng = random.Random(67)
+    for _ in range(1000):
+        action = rng.choice(['insert', 'append', 'erase', 'set']) if expected else 'append'
+        value = rng.randrange(-100, 101)
+        if action == 'insert':
+            index = rng.randrange(len(expected) + 1)
+            model.insert(index, value)
+            expected.insert(index, value)
+        elif action == 'append':
+            model.append(value)
+            expected.append(value)
+        elif action == 'erase':
+            index = rng.randrange(len(expected))
+            assert model.erase(index) == expected.pop(index)
+        else:
+            index = rng.randrange(len(expected))
+            model.set(index, value)
+            expected[index] = value
+        assert model.values() == expected
+        assert model.size == len(expected) <= len(model.slots)
+        assert all(value is None for value in model.slots[model.size:])
+    before = model.values()
+    for bad in [-1, model.size]:
+        with pytest.raises(IndexError):
+            model.erase(bad)
+    assert model.values() == before
+    for n in range(1, 15):
+        for index in range(n):
+            values = list(range(n))
+            assert ns['erase_at'](values, index) == index
+            assert values == [j for j in range(n) if j != index]

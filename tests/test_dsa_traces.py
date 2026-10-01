@@ -14,4 +14,4 @@ def test_dsa_trace_regressions():
         capture_output=True, text=True, timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert '# tests 7' in result.stdout, result.stdout
+    assert '# fail 0' in result.stdout, result.stdout

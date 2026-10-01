@@ -69,3 +69,62 @@ there is no silent fallback that could disguise a failed model call. The app req
 
 Run `.venv/bin/pytest -q tests/test_dsa_api.py`. Tests use temporary content and
 mock provider calls; they need neither a model credential nor outbound access.
+
+## Hierarchy, comparisons and publication validation
+
+Categories can declare `parent` to form a hierarchy. Each topic has one primary
+`category` and optional additional `categories` for cross-listing. Both placements
+link to the same topic ID and the same learner state. Gomory–Hu, for example,
+appears in Graph Algorithms and Advanced Graph Structures. A category parent must
+exist and category ancestry must be acyclic.
+
+`comparisons` entries have `id`, `title`, exactly two distinct `topics`, `rows`
+(`label` plus two `values` in topic order), and `guidance` explaining how to choose.
+The `#compare/{id}` route renders this data as a semantic table. Lesson pages link
+to applicable comparisons automatically. Related topics, cross-listings, paths,
+resource associations, patterns and practice attachments are validated references.
+
+Published lessons must have objectives, nonempty sections, Python/C++ code,
+complexity reasoning, configured trace input, assessments and runnable practice.
+This checks the reader contract, not pedagogical quality. Editorial review,
+algorithm tests and browser verification are still required. Legacy `ready`
+fixtures remain compatible; authors should publish using `published`.
+
+Quiz `type` is `single` (one zero-based integer `answer`) or `multiple` (a nonempty
+array of distinct option indices). Multiple-answer grading requires the exact set:
+selecting only some correct options or including a distractor fails. Both use the
+same independent mastery evidence and review scheduling. Question IDs must be
+unique within a lesson. Starter languages must have matching test harnesses;
+C++ harnesses contain their own `int main()` and use the existing `__check` protocol.
+
+New trace kinds:
+
+- `linear-search`: `values`, `target`; at most 128 bounded finite values.
+- `operation-count`: integer `n` from 0 to 48 and `mode` of `linear`, `triangular`
+  or `doubling`. Counts body executions, not every machine instruction.
+- `dynamic-array`: `values` (at most 48), initial `capacity` from 0 to 64.
+  Starts empty, appends all values, and exposes live size, capacity, copies,
+  element writes and simultaneous old/new buffers. Allocation initialization
+  is not counted as an element write.
+
+The lab reads `lesson.trace.kind` instead of assuming the topic ID is an adapter
+name. All adapters emit the existing immutable frame protocol. The array renderer
+accepts optional interval/outside labels so spare capacity is not presented as an
+excluded search candidate. Actual edited code still runs separately from traces.
+
+Upgraded `complexity` and `arrays` topics retain their original completion IDs
+(`dsa-1-1`, `dsa-1-2`). Reading and writing completion both use that mapping;
+mastery, notes and trace evidence use canonical topic IDs. No completion is
+converted into mastery. Path recommendations visit prerequisite ancestors before
+ranking available topics in the chosen path, and still exclude unmet prerequisites.
+
+Validate content without starting the web application or touching its database:
+
+```sh
+.venv/bin/python tools/validate_dsa.py
+.venv/bin/python tools/validate_dsa.py --content-dir /path/to/candidate/dsa
+```
+
+The command exits nonzero on invalid revisions and distinguishes published,
+legacy, planned and unresolved counts. Restart the service after publishing a
+validated revision; an already cached server revision is intentionally immutable.

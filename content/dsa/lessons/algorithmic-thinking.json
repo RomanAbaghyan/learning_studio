@@ -1,0 +1,272 @@
+{
+  "id": "algorithmic-thinking",
+  "title": "Algorithmic Thinking: Contracts, State and Proof",
+  "summary": "Turn an informal request into a precise contract, build a baseline algorithm, and justify every step before optimizing.",
+  "objectives": [
+    "Specify inputs, outputs, preconditions and postconditions",
+    "Separate correctness from termination and performance",
+    "Derive a loop invariant from a shrinking search space",
+    "Use brute force as a reference and reject invalid optimizations",
+    "Translate between iterative and recursive descriptions"
+  ],
+  "sections": [
+    {
+      "id": "motivation",
+      "title": "Why this matters: code needs a contract",
+      "body": "A request such as “find this event” hides decisions: first match or any match, original position or sorted position, what equality means, and what happens when nothing matches. Fast code answering the wrong version is incorrect. Algorithm design starts by choosing an input model and a testable output condition. The reference problem finds the first occurrence in an unsorted sequence; it is small enough to prove completely, yet exposes the same discipline needed for graph search and optimization."
+    },
+    {
+      "id": "intuition",
+      "title": "Intuition: establish facts, then shrink uncertainty",
+      "body": "Imagine inspecting a log from oldest to newest. After inspecting three nonmatching entries, the first match cannot be among them. You do not need to remember all three comparisons: the current index summarizes that established fact. State is useful when it compresses the relevant history without discarding information needed for future decisions. A search algorithm repeatedly converts candidates into excluded or confirmed regions."
+    },
+    {
+      "id": "contract",
+      "title": "Specify the problem before the algorithm",
+      "body": "Input: a finite sequence a of n integers and an integer x. Output: the smallest index p with a[p]=x, or -1 if no such index exists. Preconditions: equality is well-defined and the sequence does not change during the scan. Postcondition: either p=-1 and every entry differs from x, or 0≤p<n, a[p]=x and every earlier entry differs from x. The input must remain unchanged. For empty input the universal statement “every entry differs” is true, so -1 is the correct result without a special scan.\n\nAn algorithm is a finite description of a procedure, not necessarily a short execution. A deterministic algorithm chooses its next state from its current state and input. Randomized algorithms also consume random choices and require a corresponding probability model. A specification can allow several correct answers even when the chosen implementation is deterministic."
+    },
+    {
+      "id": "baseline",
+      "title": "Build a baseline before optimizing",
+      "body": "Enumerate candidate indices 0 through n−1. Check the predicate a[i]=x for each candidate and return the first success. This is brute force over a search space of size n. Brute force is valuable because its completeness is obvious and it supplies an independent oracle for testing faster methods. Do not reject it merely because it is simple: if n is tiny or only one query is needed, building an index can cost more than scanning.\n\nA useful workflow is: restate the contract; construct examples and counterexamples; enumerate a correct baseline; define its state; prove its progress; count its costly operations; identify repeated work; introduce an optimization; recheck the proof and tests."
+    },
+    {
+      "id": "state",
+      "title": "State, abstraction and decomposition",
+      "body": "The scan needs the input, target and current index i. It does not need a second list of visited values. Abstract the sequence as indexed values and equality comparisons; details such as file parsing and HTTP requests belong outside this core. Split a larger system into input validation, algorithm, and output formatting, each with a contract. Such decomposition lets tests isolate logical errors from transport errors.\n\nAn abstraction is not permission to ignore costs. If indexing walks a linked list from its head, a loop using a[i] repeatedly can take quadratic time. If equality compares long strings, each comparison has its own cost. State the representation assumptions whenever analyzing the algorithm."
+    },
+    {
+      "id": "invariant",
+      "title": "Loop invariant: the examined prefix has no match",
+      "body": "At the start of iteration i, 0≤i≤n and every j with 0≤j<i satisfies a[j]≠x. Initialization: i=0 gives an empty prefix, so the claim holds. Maintenance: if a[i]≠x, increasing i extends the known nonmatching prefix by one. If a[i]=x, return i; the invariant proves that no earlier index matches. At normal loop exit i=n, the entire sequence is excluded.\n\nA useful invariant says something about the meaning of state, not just its shape. “i is an integer” is true but too weak to prove the required first-occurrence result. “The answer has not been skipped” is the intuition; the quantified prefix statement makes it precise."
+    },
+    {
+      "id": "termination",
+      "title": "Termination is a separate obligation",
+      "body": "Correctness conditioned on termination is partial correctness. To prove total correctness, also show that execution ends. The variant n−i is a nonnegative integer while the loop runs. Each unsuccessful comparison decreases it by one, and a successful comparison returns immediately. There cannot be an infinite descending sequence of nonnegative integers. A loop with i=i after a mismatch preserves the prefix invariant but fails this termination argument: invariants alone do not establish progress."
+    },
+    {
+      "id": "trace",
+      "title": "Trace an example and a counterexample",
+      "body": "For [8,3,5,3], x=3: i=0 excludes 8; i=1 finds equality and returns 1. The later 3 is irrelevant because the contract asks for the earliest position. For [8,5], x=3: both comparisons fail, i reaches 2, and the algorithm returns -1. For [3], the first comparison succeeds at index 0. This last case catches client code that incorrectly treats “if result” as a found check: use result != -1."
+    },
+    {
+      "id": "constraints",
+      "title": "Use constraints to select a feasible approach",
+      "body": "A single scan uses at most n equality tests and constant auxiliary state. For q repeated queries over unchanged data it uses up to nq tests. A dictionary mapping each value to its first index can trade preprocessing and memory for expected constant-time queries; it must retain the first index, not overwrite it with later duplicates. Sorted data enables binary search, but sorting this input without retaining original positions changes the problem. Constraints on n, q, updates, memory and latency determine which tradeoff is useful."
+    },
+    {
+      "id": "recursion",
+      "title": "Recursive and iterative thinking",
+      "body": "A recursive specification asks: if the sequence is empty, return absence; if the first element matches, return its position; otherwise search the remainder. This shrinks the problem by one and mirrors the prefix proof. A direct recursive implementation with an index uses O(n) call frames unless elimination is guaranteed. Recursively slicing the remainder can add Θ(n²) total element copies. The iterative scan expresses the same logical progression with O(1) auxiliary state. Recursion becomes more natural for branching subproblems and trees, where one index may no longer summarize the unfinished work."
+    },
+    {
+      "id": "testing",
+      "title": "Test the contract, not just an example",
+      "body": "Partition tests into empty, one element, absence, first/last occurrence, repeated matches, zero and negative values. Check input immutability. For generated small sequences, compare the implementation with a simple specification: enumerate all matching indices and take the minimum, or -1. A metamorphic property: appending nonmatching values cannot change an existing first-match answer. Tests expose counterexamples; the invariant explains why all allowed cases work. Neither timing a successful run nor passing a few samples proves correctness."
+    },
+    {
+      "id": "mistakes",
+      "title": "Common mistakes and debugging",
+      "body": "Returning -1 after the first mismatch tests only one candidate. Continuing after equality and overwriting the result returns the last match. Sorting before searching loses original positions. Mutating the sequence during scanning breaks the proof assumption. To debug, find the earliest frame where the invariant or variant fails and examine that transition, instead of adding special cases around the final wrong answer."
+    },
+    {
+      "id": "design",
+      "title": "From this example to design paradigms",
+      "body": "A baseline enumerates candidates. Preprocessing reuses work across requests. Divide and conquer discards or independently solves subspaces. Dynamic programming shares repeated subproblem answers. Greedy methods need a proof that a local choice is safe; backtracking enumerates choices and prunes only when no completion can work. Ask what structure the contract guarantees before choosing a familiar technique. Binary search, for example, requires order or a monotone decision predicate; it is not an automatic improvement for every search."
+    },
+    {
+      "id": "memory",
+      "title": "Memory and systems perspective",
+      "body": "The scan touches consecutive array elements, which is friendly to cache lines and prefetching in a packed representation. Python lists instead contain references; reading a referenced object may require another load. The Θ(1) auxiliary bound excludes input storage and does not mean zero bytes. A stream can be scanned without retaining prior entries if the task only needs a first position. For a live service, define snapshot behavior or synchronization: a concurrent edit can make “first” unstable during traversal."
+    },
+    {
+      "id": "next",
+      "title": "Exercises for reasoning",
+      "body": "Write a postcondition for returning the last match. Change the invariant to prove a count of occurrences. Design a streaming first-match algorithm with a monotonically increasing position. Construct a counterexample to sorting before returning an original index. Advanced challenge: prove that any deterministic exact algorithm must inspect all n entries on some absent-target input, because an uninspected position could contain the target."
+    }
+  ],
+  "pseudocode": "i ← 0\nwhile i < length(a):\n    invariant: a[0:i] contains no target\n    if a[i] = target: return i\n    i ← i + 1\nreturn -1",
+  "implementations": {
+    "python": "def first_index(values, target):\n    # Invariant: every index before i differs from target.\n    for i, value in enumerate(values):\n        if value == target:\n            return i\n    return -1\n\nassert first_index([8, 3, 5, 3], 3) == 1\nassert first_index([], 3) == -1\n",
+    "cpp": "#include <vector>\n#include <cassert>\n#include <cstddef>\nusing namespace std;\n// Educational inputs have at most 10,000 elements, so int holds each index.\nint first_index(const vector<int>& values, int target) {\n    for (size_t i = 0; i < values.size(); ++i)\n        if (values[i] == target) return static_cast<int>(i);\n    return -1;\n}\nint main() {\n    assert(first_index({8, 3, 5, 3}, 3) == 1);\n    assert(first_index({}, 3) == -1);\n}\n",
+    "java": "class FirstMatch {\n    static int firstIndex(int[] values, int target) {\n        for (int i = 0; i < values.length; i++)\n            if (values[i] == target) return i;\n        return -1;\n    }\n    public static void main(String[] args) {\n        if (firstIndex(new int[]{8, 3, 5, 3}, 3) != 1)\n            throw new AssertionError(\"first occurrence\");\n        System.out.println(firstIndex(new int[]{}, 3));\n    }\n}\n",
+    "typescript": "function firstIndex(values: number[], target: number): number {\n  for (let i = 0; i < values.length; i++) {\n    if (values[i] === target) return i;\n  }\n  return -1;\n}\nconsole.log(firstIndex([8, 3, 5, 3], 3)); // 1\n",
+    "javascript": "function firstIndex(values, target) {\n  for (let i = 0; i < values.length; i++) {\n    if (values[i] === target) return i;\n  }\n  return -1;\n}\nconsole.log(firstIndex([8, 3, 5, 3], 3)); // 1\n"
+  },
+  "complexity": [
+    {
+      "operation": "First-occurrence scan",
+      "time": "Θ(n) worst; Θ(1) best for nonempty input",
+      "space": "Θ(1) auxiliary",
+      "why": "Each unsuccessful comparison eliminates exactly one candidate; a match at position p uses p+1 comparisons."
+    },
+    {
+      "operation": "q independent scans",
+      "time": "O(nq)",
+      "space": "Θ(1) auxiliary",
+      "why": "Each query may inspect every entry; q is a separate input parameter."
+    },
+    {
+      "operation": "Preprocess first positions",
+      "time": "O(n) expected build; O(1) expected lookup",
+      "space": "O(n)",
+      "why": "Hashing can share work across queries under suitable hashing assumptions, at a storage cost."
+    }
+  ],
+  "quiz": [
+    {
+      "id": "contract",
+      "type": "single",
+      "prompt": "Which result meets the contract for [4,7,4] and target 4?",
+      "options": [
+        "0",
+        "2",
+        "Either index",
+        "4"
+      ],
+      "answer": 0,
+      "explanation": "The contract asks for the smallest original index; returning any match is weaker.",
+      "dimension": "Recognize"
+    },
+    {
+      "id": "absence",
+      "type": "single",
+      "prompt": "Where must return -1 occur?",
+      "options": [
+        "After the first mismatch",
+        "Only after every candidate is excluded",
+        "Immediately for unsorted input",
+        "After finding a zero index"
+      ],
+      "answer": 1,
+      "explanation": "Absence is a universal claim about all candidates.",
+      "dimension": "Debug"
+    },
+    {
+      "id": "variant",
+      "type": "single",
+      "prompt": "A loop preserves the prefix invariant but never increments i. What is missing?",
+      "options": [
+        "More memory",
+        "A termination argument with a strictly decreasing variant",
+        "Sorted input",
+        "A random seed"
+      ],
+      "answer": 1,
+      "explanation": "Preservation alone is partial correctness; n−i must decrease.",
+      "dimension": "Prove"
+    },
+    {
+      "id": "queries",
+      "type": "single",
+      "prompt": "What extra fact makes preprocessing attractive?",
+      "options": [
+        "Many queries over unchanged input",
+        "The input has one element",
+        "The target is negative",
+        "Only one query and no spare memory"
+      ],
+      "answer": 0,
+      "explanation": "Build cost can be shared across repeated queries; updates may invalidate that benefit.",
+      "dimension": "Apply"
+    },
+    {
+      "id": "work",
+      "type": "single",
+      "prompt": "An absent target in a sequence of length 9 uses how many equality tests?",
+      "options": [
+        "0",
+        "3",
+        "9",
+        "81"
+      ],
+      "answer": 2,
+      "explanation": "Every candidate must be excluded once.",
+      "dimension": "Analyze"
+    },
+    {
+      "id": "proof-obligations",
+      "type": "multiple",
+      "prompt": "Which obligations together establish total correctness of the scan?",
+      "options": [
+        "Initialization of the excluded-prefix invariant",
+        "Timing one sample input",
+        "Preservation and a postcondition at exit",
+        "A strictly decreasing nonnegative variant"
+      ],
+      "answer": [
+        0,
+        2,
+        3
+      ],
+      "explanation": "Initialization, preservation, exit reasoning and termination cover all allowed inputs. A sample timing establishes none of these obligations.",
+      "dimension": "Prove"
+    }
+  ],
+  "problems": [
+    {
+      "id": "first-unsorted-match",
+      "title": "First matching event",
+      "difficulty": "Introductory",
+      "topics": [
+        "algorithmic-thinking"
+      ],
+      "patterns": [
+        "linear-scan"
+      ],
+      "prerequisites": [],
+      "statement": "Implement first_index(values, target) in Python/C++, or firstIndex(values, target) in JavaScript. Return the smallest index containing target, or -1 if absent. Preserve the input order and do not mutate the sequence. Values are unsorted and may repeat.",
+      "constraints": [
+        "0 ≤ n ≤ 10,000",
+        "Integer values and target in [−1,000,000, 1,000,000]",
+        "Equality is exact; no NaN values"
+      ],
+      "examples": [
+        "[8, 3, 5, 3], target 3 → 1",
+        "[], target 3 → -1",
+        "[0, -2, 0], target 0 → 0"
+      ],
+      "hints": [
+        "Which indices can still contain the first occurrence after you have ruled out a prefix?",
+        "Scan left to right. Stop on equality; later matches cannot be earlier.",
+        "Return -1 only after the loop, not after the first unequal value."
+      ],
+      "starter": {
+        "python": "def first_index(values, target):\n    # Return the earliest match, or -1.\n    return -1\n",
+        "javascript": "function firstIndex(values, target) {\n  return -1;\n}\n",
+        "cpp": "int first_index(const vector<int>& values, int target) {\n    return -1;\n}\n"
+      },
+      "tests": {
+        "python": "__check('earliest duplicate', first_index([8,3,5,3],3),1)\n__check('empty', first_index([],3),-1)\n__check('absent', first_index([2,4],3),-1)\n__check('zero at start', first_index([0,-2,0],0),0)\na=[9,1,9]\n__check('last candidate', first_index(a,1),1)\n__check('unchanged', a,[9,1,9])",
+        "javascript": "__check('earliest duplicate',firstIndex([8,3,5,3],3),1);\n__check('empty',firstIndex([],3),-1);\n__check('absent',firstIndex([2,4],3),-1);\n__check('zero at start',firstIndex([0,-2,0],0),0);\nconst a=[9,1,9]; firstIndex(a,1); __check('unchanged',a,[9,1,9]);",
+        "cpp": "int main() {\n__check(\"earliest duplicate\",first_index({8,3,5,3},3),1);\n__check(\"empty\",first_index({},3),-1);\n__check(\"absent\",first_index({2,4},3),-1);\n__check(\"zero at start\",first_index({0,-2,0},0),0);\nreturn 0;\n}\n"
+      },
+      "solution": {
+        "Naive approach": "Sort the events and search them, but this changes their positions. Sorting values alone cannot meet the original-index contract.",
+        "Insight": "At position i, all earlier positions have already been ruled out. The first equality encountered is the smallest valid index.",
+        "Algorithm": "Scan from index 0. Return immediately on equality. If the scan finishes, return -1.",
+        "Correctness": "The excluded-prefix invariant holds initially, extends after an unequal comparison, and proves minimality when equality is found. At exhaustion every position is excluded.",
+        "Complexity": "At most n equality tests, Θ(n) worst-case time and Θ(1) auxiliary space under constant-time integer comparison.",
+        "Alternatives": "For repeated queries over an unchanged sequence, preprocess value → first index. This spends O(n) expected construction time and O(n) space for expected O(1) lookup; preserve first entries rather than overwriting them.",
+        "Common mistakes": "Returning -1 inside the loop; returning the last match; treating index 0 as false; sorting away the original positions."
+      }
+    }
+  ],
+  "resources": [
+    "mit-computation"
+  ],
+  "trace": {
+    "kind": "linear-search",
+    "input": {
+      "values": [
+        8,
+        3,
+        5,
+        3,
+        9
+      ],
+      "target": 3
+    }
+  }
+}

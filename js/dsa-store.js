@@ -86,7 +86,23 @@ const DSAStore = (() => {
   }
   function ready(topic, isComplete) { return object(topic) && Array.isArray(topic.prerequisites) && topic.prerequisites.every(id => safeId(id) && isComplete(id)); }
   function recommendations(catalog, isComplete) {
-    return (Array.isArray(catalog?.topics) ? catalog.topics : []).filter(topic => object(topic) && ['published', 'legacy', 'ready'].includes(topic.status) && safeId(topic.id) && !isComplete(topic.id) && ready(topic, isComplete));
+    const topics = Array.isArray(catalog?.topics) ? catalog.topics : [];
+    const byId = new Map(topics.filter(object).map(topic => [topic.id, topic]));
+    const path = (Array.isArray(catalog?.paths) ? catalog.paths : []).find(item => item.id === read().path);
+    const order = new Map(), seen = new Set();
+    // Include missing ancestors of path nodes; selecting an advanced path must
+    // still suggest its available foundations before advanced material.
+    function visit(id) {
+      if (seen.has(id)) return;
+      seen.add(id);
+      const item = byId.get(id);
+      if (!item) return;
+      if (Array.isArray(item.prerequisites)) item.prerequisites.forEach(visit);
+      order.set(id, order.size);
+    }
+    if (Array.isArray(path?.topics)) path.topics.forEach(visit);
+    return topics.filter(topic => object(topic) && ['published', 'legacy', 'ready'].includes(topic.status) && safeId(topic.id) && !isComplete(topic.id) && ready(topic, isComplete))
+      .sort((a, b) => (order.get(a.id) ?? Infinity) - (order.get(b.id) ?? Infinity));
   }
   return {
     KEY, dimensions, read, record, mastery, ready, recommendations,

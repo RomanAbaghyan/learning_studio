@@ -162,3 +162,64 @@ def test_external_provider_failure_redacts_secrets(content, monkeypatch):
     response = client(content).post("/api/dsa/tutor", json={"lessonId": "binary-search", "question": "Why?"})
     assert response.status_code == 502
     assert "secret" not in response.text
+
+
+@pytest.mark.parametrize('mutation', [
+    'path-topic', 'resource-topic', 'resource-prerequisite', 'pattern-topic',
+    'related', 'category', 'category-cycle', 'cross-list', 'problem-topic',
+    'comparison-topic', 'comparison-width',
+])
+def test_navigation_reference_validation(content, mutation):
+    path = content / 'catalog.json'
+    data = json.loads(path.read_text())
+    if mutation == 'path-topic':
+        data['paths'] = [{'id': 'bad-path', 'topics': ['missing']}]
+    elif mutation == 'resource-topic':
+        data['resources'][0]['topics'] = ['missing']
+    elif mutation == 'resource-prerequisite':
+        data['resources'][0]['prerequisites'] = ['missing']
+    elif mutation == 'pattern-topic':
+        data['patterns'] = [{'id': 'bad-pattern', 'topics': ['missing']}]
+    elif mutation == 'related':
+        data['topics'][0]['related'] = ['missing']
+    elif mutation == 'category':
+        data['topics'][0]['category'] = 'missing'
+    elif mutation == 'category-cycle':
+        data['categories'] = [{'id': 'a', 'parent': 'b'}, {'id': 'b', 'parent': 'a'}]
+    elif mutation == 'cross-list':
+        data['topics'][0]['categories'] = ['missing']
+    elif mutation == 'problem-topic':
+        data['problems'] = [{'id': 'orphan', 'topics': ['missing']}]
+    else:
+        data['comparisons'] = [{'id': 'pair', 'topics': ['arrays', 'binary-search'],
+                                'rows': [{'label': 'time', 'values': ['linear', 'logarithmic']}],
+                                'guidance': 'Check ordering.'}]
+        if mutation == 'comparison-topic':
+            data['comparisons'][0]['topics'][1] = 'missing'
+        else:
+            data['comparisons'][0]['rows'][0]['values'].pop()
+    path.write_text(json.dumps(data))
+    response = client(content).get('/api/dsa/catalog')
+    assert response.status_code == 503
+    assert str(content) not in response.text
+
+
+def test_real_catalog_hierarchy_canonical_aliases_and_foundation_lessons():
+    root = Path(__file__).resolve().parents[1] / 'content' / 'dsa'
+    api = client(root)
+    response = api.get('/api/dsa/catalog')
+    assert response.status_code == 200
+    catalog = response.json()
+    topics = {item['id']: item for item in catalog['topics']}
+    assert topics['fibonacci-tree']['status'] == 'unresolved'
+    assert 'Binary Indexed Tree' in topics['fenwick-tree']['aliases']
+    assert 'graph-structures' in topics['gomory-hu-tree']['categories']
+    assert any(item.get('parent') == 'structures' for item in catalog['categories'])
+    for id in ['algorithmic-thinking', 'complexity', 'arrays']:
+        assert topics[id]['status'] == 'published'
+        data = api.get('/api/dsa/lessons/' + id).json()
+        assert len(data['sections']) >= 10
+        assert len(data['quiz']) >= 5
+        assert api.get('/api/dsa/problems', params={'topic': id}).json()['total'] >= 1
+    assert topics['arrays']['legacyId'] == 'dsa-1-2'
+    assert topics['complexity']['legacyId'] == 'dsa-1-1'

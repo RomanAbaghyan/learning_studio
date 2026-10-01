@@ -98,3 +98,48 @@ test('reject malformed, unbounded and semantically invalid teaching inputs', () 
     ['knapsack', { items: [], capacity: 41 }], ['knapsack', { items: [{ weight: 0.5, value: 2 }], capacity: 1 }]
   ]) assert.throws(() => generate(kind, input));
 });
+
+test('linear trace proves first occurrence and counts only comparisons actually executed', () => {
+  for (let n=0;n<35;n++) {
+    const values=Array.from({length:n},()=>random(9)-4);
+    for(let target=-5;target<=5;target++) {
+      const trace=generate('linear-search',{values,target});
+      const result=values.indexOf(target);
+      assert.equal(trace.result,result);
+      assert.equal(trace.frames.at(-1).counters.comparisons,result<0?n:result+1);
+      for(const frame of trace.frames) assert.ok(values.slice(0,frame.variables.i).every(v=>v!==target));
+    }
+  }
+});
+
+test('operation counters match closed-form oracles including empty input', () => {
+  for(let n=0;n<=48;n++)for(const mode of ['linear','triangular','doubling']) {
+    const trace=generate('operation-count',{n,mode});
+    const expected=mode==='linear'?n:mode==='triangular'?n*(n-1)/2:n<=1?0:Math.ceil(Math.log2(n));
+    assert.equal(trace.result,expected);
+    assert.equal(trace.frames.at(-1).counters.bodyExecutions,expected);
+  }
+  assert.throws(()=>generate('operation-count',{n:49}));
+  assert.throws(()=>generate('operation-count',{n:1.5}));
+  assert.throws(()=>generate('operation-count',{n:2,mode:'unknown'}));
+});
+
+test('array growth preserves live prefixes, models temporary allocation, and has linear aggregate copying', () => {
+  for (const capacity of [0,1,3,8,64])for(let n=0;n<=48;n++) {
+    const values=Array.from({length:n},(_,i)=>i-10);
+    const trace=generate('dynamic-array',{values,capacity});
+    assert.deepEqual(trace.result,values);
+    const last=trace.frames.at(-1);
+    assert.equal(last.counters.writes,n+last.counters.copies);
+    if(capacity===0 && n>0) assert.ok(last.counters.copies<2*n);
+    for(const frame of trace.frames) {
+      const {size,capacity:cap}=frame.variables;
+      assert.ok(size>=0 && size<=cap);
+      assert.deepEqual(frame.view.values.slice(0,size),values.slice(0,size));
+      assert.ok(frame.view.values.slice(size).every(v=>v===null));
+      if(frame.line===3) assert.equal(frame.memory.length,2,'old and new allocations coexist during copying');
+    }
+  }
+  assert.throws(()=>generate('dynamic-array',{values:[1],capacity:-1}));
+  assert.throws(()=>generate('dynamic-array',{values:Array(49).fill(1)}));
+});

@@ -10,16 +10,76 @@
       "title": "Data Structures"
     },
     {
+      "id": "linear",
+      "title": "Linear Structures",
+      "parent": "structures"
+    },
+    {
+      "id": "stacks-queues",
+      "title": "Stacks & Queues",
+      "parent": "structures"
+    },
+    {
+      "id": "hash-based",
+      "title": "Hash-Based Structures",
+      "parent": "structures"
+    },
+    {
+      "id": "tree-foundations",
+      "title": "Tree Foundations",
+      "parent": "structures"
+    },
+    {
+      "id": "balanced-trees",
+      "title": "Balanced Search Trees",
+      "parent": "structures"
+    },
+    {
+      "id": "multiway-trees",
+      "title": "Multiway Search Trees",
+      "parent": "structures"
+    },
+    {
+      "id": "string-structures",
+      "title": "String Structures",
+      "parent": "structures"
+    },
+    {
+      "id": "range-structures",
+      "title": "Range Query Structures",
+      "parent": "structures"
+    },
+    {
+      "id": "spatial",
+      "title": "Spatial Structures",
+      "parent": "structures"
+    },
+    {
+      "id": "specialized-trees",
+      "title": "Specialized Trees",
+      "parent": "structures"
+    },
+    {
+      "id": "set-structures",
+      "title": "Set Structures",
+      "parent": "structures"
+    },
+    {
+      "id": "graph-structures",
+      "title": "Advanced Graph Structures",
+      "parent": "structures"
+    },
+    {
       "id": "search-sort",
       "title": "Searching and Sorting"
     },
     {
       "id": "trees",
-      "title": "Trees and Range Queries"
+      "title": "Tree Algorithms"
     },
     {
       "id": "graphs",
-      "title": "Graphs"
+      "title": "Graph Algorithms"
     },
     {
       "id": "design",
@@ -37,24 +97,32 @@
   "topics": [
     {
       "id": "algorithmic-thinking",
-      "title": "Algorithmic Thinking",
+      "title": "Algorithmic Thinking: Contracts, State and Proof",
       "category": "foundations",
       "difficulty": "Foundation",
-      "minutes": null,
+      "minutes": 70,
       "prerequisites": [],
-      "related": [],
-      "status": "planned"
+      "related": [
+        "complexity",
+        "binary-search",
+        "linear-search"
+      ],
+      "status": "published",
+      "description": "Specify the contract, derive a baseline, and prove correctness and termination."
     },
     {
       "id": "complexity",
-      "title": "Complexity and Cost Models",
+      "title": "Complexity: Counts, Bounds and Cost Models",
       "category": "foundations",
       "difficulty": "Foundation",
-      "minutes": 30,
-      "prerequisites": [],
+      "minutes": 100,
+      "prerequisites": [
+        "algorithmic-thinking"
+      ],
       "related": [],
-      "status": "legacy",
-      "legacyId": "dsa-1-1"
+      "status": "published",
+      "legacyId": "dsa-1-1",
+      "description": "From exact operation counts to tight bounds, expected work, amortization and memory."
     },
     {
       "id": "mathematical-tools",
@@ -70,21 +138,28 @@
     },
     {
       "id": "arrays",
-      "title": "Arrays and Hashing Foundations",
-      "category": "structures",
+      "title": "Arrays: Representation, Growth and Locality",
+      "category": "linear",
       "difficulty": "Beginner",
-      "minutes": 30,
+      "minutes": 100,
       "prerequisites": [
         "complexity"
       ],
-      "related": [],
-      "status": "legacy",
-      "legacyId": "dsa-1-2"
+      "related": [
+        "linear-structures",
+        "linked-lists",
+        "prefix-sum",
+        "sparse-set",
+        "hash-tables"
+      ],
+      "status": "published",
+      "legacyId": "dsa-1-2",
+      "description": "Trace allocation and copying; implement stable updates and prove amortized append."
     },
     {
       "id": "linear-structures",
       "title": "Linked Lists, Stacks and Queues",
-      "category": "structures",
+      "category": "linear",
       "difficulty": "Beginner",
       "minutes": 30,
       "prerequisites": [
@@ -111,7 +186,7 @@
     {
       "id": "trees-graphs",
       "title": "Trees and Graphs Foundations",
-      "category": "trees",
+      "category": "tree-foundations",
       "difficulty": "Intermediate",
       "minutes": 30,
       "prerequisites": [
@@ -138,7 +213,7 @@
     {
       "id": "heaps",
       "title": "Heaps and Priority Queues",
-      "category": "trees",
+      "category": "stacks-queues",
       "difficulty": "Intermediate",
       "minutes": 30,
       "prerequisites": [
@@ -171,20 +246,28 @@
         "arrays",
         "complexity"
       ],
-      "related": [],
+      "related": [
+        "linear-search",
+        "divide-conquer",
+        "sorting-searching"
+      ],
       "status": "published"
     },
     {
       "id": "avl-tree",
       "title": "AVL Trees: Maintain Order and Balance",
-      "category": "trees",
+      "category": "balanced-trees",
       "difficulty": "Advanced",
       "minutes": 90,
       "prerequisites": [
         "trees-graphs",
         "complexity"
       ],
-      "related": [],
+      "related": [
+        "bst",
+        "red-black-tree",
+        "b-tree"
+      ],
       "status": "published"
     },
     {
@@ -198,7 +281,11 @@
         "heaps",
         "complexity"
       ],
-      "related": [],
+      "related": [
+        "bfs",
+        "bellman-ford",
+        "greedy"
+      ],
       "status": "published"
     },
     {
@@ -211,13 +298,17 @@
         "dynamic-programming",
         "arrays"
       ],
-      "related": [],
+      "related": [
+        "recursion",
+        "bitmask-dp",
+        "interval-dp"
+      ],
       "status": "published"
     },
     {
       "id": "strings",
       "title": "Strings, Encoding and Representation",
-      "category": "structures",
+      "category": "linear",
       "difficulty": "Beginner",
       "minutes": null,
       "prerequisites": [
@@ -229,7 +320,7 @@
     {
       "id": "hash-tables",
       "title": "Hash Tables",
-      "category": "structures",
+      "category": "hash-based",
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
@@ -267,7 +358,7 @@
     {
       "id": "bst",
       "title": "Binary Search Trees",
-      "category": "trees",
+      "category": "balanced-trees",
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
@@ -467,7 +558,7 @@
     {
       "id": "xor-linked-list",
       "title": "XOR Linked List",
-      "category": "structures",
+      "category": "linear",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -478,12 +569,13 @@
       "status": "planned",
       "tags": [
         "data-structure"
-      ]
+      ],
+      "description": "Encode neighboring addresses with XOR; study traversal state and representation constraints."
     },
     {
       "id": "skip-list",
       "title": "Skip List",
-      "category": "structures",
+      "category": "linear",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -494,12 +586,13 @@
       "status": "planned",
       "tags": [
         "data-structure"
-      ]
+      ],
+      "description": "Probabilistic express lanes over an ordered linked sequence."
     },
     {
       "id": "self-organizing-list",
       "title": "Self-Organizing List",
-      "category": "structures",
+      "category": "linear",
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
@@ -515,7 +608,7 @@
     {
       "id": "unrolled-linked-list",
       "title": "Unrolled Linked List",
-      "category": "structures",
+      "category": "linear",
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
@@ -531,7 +624,7 @@
     {
       "id": "n-ary-tree",
       "title": "N-ary Tree",
-      "category": "trees",
+      "category": "tree-foundations",
       "difficulty": "Beginner",
       "minutes": null,
       "prerequisites": [
@@ -546,7 +639,7 @@
     {
       "id": "red-black-tree",
       "title": "Red-Black Tree",
-      "category": "trees",
+      "category": "balanced-trees",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -562,7 +655,7 @@
     {
       "id": "splay-tree",
       "title": "Splay Tree",
-      "category": "trees",
+      "category": "balanced-trees",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -578,7 +671,7 @@
     {
       "id": "scapegoat-tree",
       "title": "Scapegoat Tree",
-      "category": "trees",
+      "category": "balanced-trees",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -594,7 +687,7 @@
     {
       "id": "treap",
       "title": "Treap",
-      "category": "trees",
+      "category": "balanced-trees",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -610,7 +703,7 @@
     {
       "id": "2-3-4-tree",
       "title": "2–3–4 Tree",
-      "category": "trees",
+      "category": "balanced-trees",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -625,7 +718,7 @@
     {
       "id": "b-tree",
       "title": "B-Tree",
-      "category": "trees",
+      "category": "multiway-trees",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -640,7 +733,7 @@
     {
       "id": "b-plus-tree",
       "title": "B+ Tree",
-      "category": "trees",
+      "category": "multiway-trees",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -655,7 +748,7 @@
     {
       "id": "b-star-tree",
       "title": "B* Tree",
-      "category": "trees",
+      "category": "multiway-trees",
       "difficulty": "Expert",
       "minutes": null,
       "prerequisites": [
@@ -670,7 +763,7 @@
     {
       "id": "trie",
       "title": "Trie",
-      "category": "trees",
+      "category": "string-structures",
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
@@ -686,7 +779,7 @@
     {
       "id": "ternary-search-tree",
       "title": "Ternary Search Tree",
-      "category": "trees",
+      "category": "string-structures",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -702,7 +795,7 @@
     {
       "id": "suffix-tree",
       "title": "Suffix Tree",
-      "category": "trees",
+      "category": "string-structures",
       "difficulty": "Expert",
       "minutes": null,
       "prerequisites": [
@@ -718,7 +811,7 @@
     {
       "id": "suffix-array",
       "title": "Suffix Array",
-      "category": "trees",
+      "category": "string-structures",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -734,7 +827,7 @@
     {
       "id": "eertree",
       "title": "Palindromic Tree (Eertree)",
-      "category": "trees",
+      "category": "string-structures",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -750,14 +843,18 @@
     {
       "id": "segment-tree",
       "title": "Segment Tree",
-      "category": "trees",
+      "category": "range-structures",
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
         "arrays",
         "recursion"
       ],
-      "related": [],
+      "related": [
+        "fenwick-tree",
+        "lazy-segment-tree",
+        "persistent-segment-tree"
+      ],
       "status": "planned",
       "tags": [
         "data-structure"
@@ -766,17 +863,22 @@
     {
       "id": "fenwick-tree",
       "title": "Fenwick Tree",
-      "category": "trees",
+      "category": "range-structures",
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
         "arrays",
         "bit-manipulation"
       ],
-      "related": [],
+      "related": [
+        "segment-tree",
+        "prefix-sum",
+        "sparse-table"
+      ],
       "status": "planned",
       "aliases": [
-        "Binary Indexed Tree"
+        "Binary Indexed Tree",
+        "BIT"
       ],
       "tags": [
         "data-structure"
@@ -785,7 +887,7 @@
     {
       "id": "interval-tree",
       "title": "Interval Tree",
-      "category": "trees",
+      "category": "range-structures",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -801,7 +903,7 @@
     {
       "id": "kd-tree",
       "title": "KD Tree",
-      "category": "trees",
+      "category": "spatial",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -820,7 +922,7 @@
     {
       "id": "cartesian-tree",
       "title": "Cartesian Tree",
-      "category": "trees",
+      "category": "specialized-trees",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -836,7 +938,7 @@
     {
       "id": "dsu",
       "title": "Disjoint Set Union",
-      "category": "trees",
+      "category": "set-structures",
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
@@ -855,7 +957,7 @@
     {
       "id": "sparse-set",
       "title": "Sparse Set",
-      "category": "structures",
+      "category": "set-structures",
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
@@ -865,12 +967,13 @@
       "status": "planned",
       "tags": [
         "data-structure"
-      ]
+      ],
+      "description": "Dense iteration with sparse direct-address membership and swap deletion."
     },
     {
       "id": "bk-tree",
       "title": "BK-Tree",
-      "category": "trees",
+      "category": "specialized-trees",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -899,12 +1002,16 @@
       "tags": [
         "data-structure",
         "advanced-graph"
-      ]
+      ],
+      "categories": [
+        "graph-structures"
+      ],
+      "description": "Represent pairwise minimum cuts of an undirected capacitated graph using a weighted tree."
     },
     {
       "id": "van-emde-boas-tree",
       "title": "van Emde Boas Tree",
-      "category": "trees",
+      "category": "specialized-trees",
       "difficulty": "Expert",
       "minutes": null,
       "prerequisites": [
@@ -920,7 +1027,7 @@
     {
       "id": "lazy-segment-tree",
       "title": "Lazy Segment Tree",
-      "category": "trees",
+      "category": "range-structures",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -935,7 +1042,7 @@
     {
       "id": "persistent-segment-tree",
       "title": "Persistent Segment Tree",
-      "category": "trees",
+      "category": "range-structures",
       "difficulty": "Expert",
       "minutes": null,
       "prerequisites": [
@@ -950,7 +1057,7 @@
     {
       "id": "li-chao-tree",
       "title": "Li Chao Tree",
-      "category": "trees",
+      "category": "range-structures",
       "difficulty": "Expert",
       "minutes": null,
       "prerequisites": [
@@ -966,7 +1073,7 @@
     {
       "id": "wavelet-tree",
       "title": "Wavelet Tree",
-      "category": "trees",
+      "category": "range-structures",
       "difficulty": "Expert",
       "minutes": null,
       "prerequisites": [
@@ -982,7 +1089,7 @@
     {
       "id": "order-statistic-tree",
       "title": "Order Statistic Tree",
-      "category": "trees",
+      "category": "range-structures",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -997,7 +1104,7 @@
     {
       "id": "quad-tree",
       "title": "Quad Tree",
-      "category": "trees",
+      "category": "spatial",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -1013,7 +1120,7 @@
     {
       "id": "fibonacci-tree",
       "title": "Fibonacci Tree — definition awaiting curation",
-      "category": "trees",
+      "category": "specialized-trees",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -1021,7 +1128,8 @@
         "recursion"
       ],
       "related": [],
-      "status": "unresolved"
+      "status": "unresolved",
+      "description": "Source definition required before authoring; no automatic substitution with Fibonacci Heap."
     },
     {
       "id": "kmp",
@@ -1189,7 +1297,7 @@
     {
       "id": "sparse-table",
       "title": "Sparse Table",
-      "category": "trees",
+      "category": "range-structures",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -1215,7 +1323,7 @@
     {
       "id": "monotonic-structures",
       "title": "Monotonic Stacks and Queues",
-      "category": "structures",
+      "category": "stacks-queues",
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
@@ -1226,14 +1334,359 @@
     },
     {
       "id": "prefix-sum",
-      "title": "Prefix Sums and Difference Arrays",
-      "category": "design",
-      "difficulty": "Advanced",
+      "title": "Prefix Sums",
+      "category": "range-structures",
+      "difficulty": "Beginner",
       "minutes": null,
       "prerequisites": [
         "arrays"
       ],
       "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "linked-lists",
+      "title": "Linked Lists",
+      "category": "linear",
+      "difficulty": "Beginner",
+      "minutes": null,
+      "prerequisites": [
+        "arrays"
+      ],
+      "related": [
+        "arrays",
+        "xor-linked-list",
+        "unrolled-linked-list",
+        "skip-list"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "stacks",
+      "title": "Stacks",
+      "category": "stacks-queues",
+      "difficulty": "Beginner",
+      "minutes": null,
+      "prerequisites": [
+        "arrays"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "queues",
+      "title": "Queues and Deques",
+      "category": "stacks-queues",
+      "difficulty": "Beginner",
+      "minutes": null,
+      "prerequisites": [
+        "arrays"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "linear-search",
+      "title": "Linear Search",
+      "category": "search-sort",
+      "difficulty": "Beginner",
+      "minutes": null,
+      "prerequisites": [
+        "algorithmic-thinking",
+        "arrays"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "bubble-sort",
+      "title": "Bubble Sort",
+      "category": "search-sort",
+      "difficulty": "Beginner",
+      "minutes": null,
+      "prerequisites": [
+        "arrays",
+        "complexity"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "selection-sort",
+      "title": "Selection Sort",
+      "category": "search-sort",
+      "difficulty": "Beginner",
+      "minutes": null,
+      "prerequisites": [
+        "arrays",
+        "complexity"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "insertion-sort",
+      "title": "Insertion Sort",
+      "category": "search-sort",
+      "difficulty": "Beginner",
+      "minutes": null,
+      "prerequisites": [
+        "arrays",
+        "complexity"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "merge-sort",
+      "title": "Merge Sort",
+      "category": "search-sort",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "divide-conquer"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "quick-sort",
+      "title": "Quick Sort",
+      "category": "search-sort",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "divide-conquer"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "heap-sort",
+      "title": "Heap Sort",
+      "category": "search-sort",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "heaps"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "counting-sort",
+      "title": "Counting Sort",
+      "category": "search-sort",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "arrays",
+        "complexity"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "radix-sort",
+      "title": "Radix Sort",
+      "category": "search-sort",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "counting-sort"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "bucket-sort",
+      "title": "Bucket Sort",
+      "category": "search-sort",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "arrays",
+        "randomized-algorithms"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "floyd-warshall",
+      "title": "Floyd–Warshall",
+      "category": "graphs",
+      "difficulty": "Advanced",
+      "minutes": null,
+      "prerequisites": [
+        "dynamic-programming",
+        "trees-graphs"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "zero-one-bfs",
+      "title": "0–1 BFS",
+      "category": "graphs",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "bfs"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "a-star",
+      "title": "A* Search",
+      "category": "graphs",
+      "difficulty": "Advanced",
+      "minutes": null,
+      "prerequisites": [
+        "dijkstra"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "johnson",
+      "title": "Johnson’s Algorithm",
+      "category": "graphs",
+      "difficulty": "Advanced",
+      "minutes": null,
+      "prerequisites": [
+        "bellman-ford",
+        "dijkstra"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "sequence-dp",
+      "title": "Sequence DP: LIS, LCS and Edit Distance",
+      "category": "design",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "dynamic-programming",
+        "strings"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "grid-dp",
+      "title": "Grid Dynamic Programming",
+      "category": "design",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "dynamic-programming"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "branch-bound",
+      "title": "Branch and Bound",
+      "category": "design",
+      "difficulty": "Advanced",
+      "minutes": null,
+      "prerequisites": [
+        "backtracking"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "sweep-line",
+      "title": "Sweep Line",
+      "category": "advanced",
+      "difficulty": "Advanced",
+      "minutes": null,
+      "prerequisites": [
+        "geometry"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "square-root-decomposition",
+      "title": "Square Root Decomposition",
+      "category": "range-structures",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "arrays"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "difference-array",
+      "title": "Difference Arrays",
+      "category": "range-structures",
+      "difficulty": "Beginner",
+      "minutes": null,
+      "prerequisites": [
+        "prefix-sum"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "z-algorithm",
+      "title": "Z Algorithm",
+      "category": "strings",
+      "difficulty": "Advanced",
+      "minutes": null,
+      "prerequisites": [
+        "strings"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "rolling-hash",
+      "title": "Rolling Hash and Rabin–Karp",
+      "category": "strings",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "strings",
+        "hash-tables"
+      ],
+      "related": [],
+      "status": "planned"
+    },
+    {
+      "id": "prim",
+      "title": "Prim’s Algorithm",
+      "category": "graphs",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "mst",
+        "heaps"
+      ],
+      "related": [
+        "kruskal"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "kruskal",
+      "title": "Kruskal’s Algorithm",
+      "category": "graphs",
+      "difficulty": "Intermediate",
+      "minutes": null,
+      "prerequisites": [
+        "mst",
+        "dsu"
+      ],
+      "related": [
+        "prim"
+      ],
       "status": "planned"
     }
   ],
@@ -1241,8 +1694,9 @@
     {
       "id": "foundations",
       "title": "DSA Foundations",
-      "description": "Existing introductory lessons followed by a rigorous boundary-search reference.",
+      "description": "Start with contracts, cost models and memory representation, then study the original structure foundations and deep search lesson.",
       "topics": [
+        "algorithmic-thinking",
         "complexity",
         "arrays",
         "linear-structures",
@@ -1432,6 +1886,70 @@
         "Explain why changing loop direction changes the problem"
       ],
       "verified": true
+    },
+    {
+      "id": "mit-computation",
+      "title": "Lecture 1: Algorithms and Computation",
+      "type": "University Lecture",
+      "url": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-1-algorithms-and-computation/",
+      "author": "Jason Ku",
+      "publisher": "MIT OpenCourseWare",
+      "description": "Revisit the relationship between a computational problem, a correct algorithm and a cost model after completing the internal reasoning exercises.",
+      "topics": [
+        "algorithmic-thinking",
+        "complexity"
+      ],
+      "prerequisites": [],
+      "difficulty": "Foundation",
+      "minutes": 60,
+      "language": "English",
+      "cost": "free",
+      "classification": "academic",
+      "quality": "curated",
+      "notes": "Publisher page verified 2026-10-01. Study duration is an editorial estimate, not the video running time.",
+      "sections": [
+        "Problem specifications and communicating correctness",
+        "Models of computation"
+      ],
+      "objectives": [
+        "Separate a problem specification from its implementation",
+        "State the assumptions behind an efficiency claim"
+      ],
+      "verified": true
+    },
+    {
+      "id": "ods-arrays",
+      "title": "Open Data Structures — Array-Based Lists",
+      "type": "Book Chapter",
+      "url": "https://opendatastructures.org/ods-python/2_Array_Based_Lists.html",
+      "author": "Pat Morin",
+      "publisher": "Open Data Structures",
+      "description": "Compare array-backed list and queue representations after tracing resizing. Use the chapter to extend the basic model to front operations and amortized update costs.",
+      "topics": [
+        "arrays",
+        "queues",
+        "amortized-analysis"
+      ],
+      "prerequisites": [
+        "arrays",
+        "complexity"
+      ],
+      "difficulty": "Intermediate",
+      "minutes": 75,
+      "language": "English",
+      "cost": "free",
+      "classification": "academic",
+      "quality": "curated",
+      "notes": "Chapter page verified 2026-10-01. Follow its ArrayStack and ArrayQueue sections after implementing the internal array exercise.",
+      "sections": [
+        "Chapter 2 operation-cost comparison",
+        "ArrayStack and ArrayQueue subsections"
+      ],
+      "objectives": [
+        "Explain why middle updates move elements",
+        "Compare array-based representations by operation costs"
+      ],
+      "verified": true
     }
   ],
   "patterns": [
@@ -1508,6 +2026,449 @@
       "topics": [
         "avl-tree"
       ]
+    },
+    {
+      "id": "linear-scan",
+      "title": "Scan an Excluded Prefix",
+      "clues": [
+        "Unordered input",
+        "Need the first valid original position",
+        "No reusable index yet"
+      ],
+      "model": "The current index separates candidates already ruled out from candidates still possible.",
+      "template": "for i in original order:\n    if matches(a[i]): return i\nreturn absence",
+      "example": "Find the earliest matching event in an unsorted log without changing its positions.",
+      "mistakes": [
+        "Sorting changes the original position",
+        "Returning absence after only one mismatch"
+      ],
+      "topics": [
+        "algorithmic-thinking",
+        "arrays"
+      ]
+    }
+  ],
+  "comparisons": [
+    {
+      "id": "array-list",
+      "title": "Array vs Linked List",
+      "topics": [
+        "arrays",
+        "linked-lists"
+      ],
+      "rows": [
+        {
+          "label": "Representation",
+          "values": [
+            "Contiguous fixed-width slots; object payloads may be referenced.",
+            "Nodes contain payload and links; allocations can be dispersed."
+          ]
+        },
+        {
+          "label": "Indexed lookup",
+          "values": [
+            "Θ(1) under a random-access word model.",
+            "Θ(n) from the head; traverse links to locate an index."
+          ]
+        },
+        {
+          "label": "Stable middle update",
+          "values": [
+            "Θ(n) worst-case shifts; append is amortized O(1) with geometric growth.",
+            "O(1) relinking when node/predecessor is known; finding it can be Θ(n)."
+          ]
+        },
+        {
+          "label": "Memory",
+          "values": [
+            "Capacity slack; few backing allocations; copying during growth.",
+            "Per-node links, alignment and allocation overhead; no single uniform byte count."
+          ]
+        },
+        {
+          "label": "Locality and identity",
+          "values": [
+            "Sequential slots favor scans. Reallocation or shifting can invalidate locations.",
+            "Stable node addresses until removal; pointer chasing can reduce locality."
+          ]
+        },
+        {
+          "label": "Typical use",
+          "values": [
+            "Indexed sequences, DP storage, heaps, bulk processing.",
+            "Splicing known nodes and intrusive structures; not automatically faster for general inserts."
+          ]
+        }
+      ],
+      "guidance": "Count location cost as well as update cost. Prefer a packed sequence for frequent scans/indexing; choose linked nodes when their identity and known-position relinking justify allocation and locality costs."
+    },
+    {
+      "id": "stack-queue",
+      "title": "Stack vs Queue",
+      "topics": [
+        "stacks",
+        "queues"
+      ],
+      "rows": [
+        {
+          "label": "Access rule",
+          "values": [
+            "LIFO: newest unfinished state is removed first.",
+            "FIFO: oldest waiting item is removed first."
+          ]
+        },
+        {
+          "label": "Operations",
+          "values": [
+            "push, pop and peek at one end.",
+            "enqueue at back, dequeue at front, peek at front."
+          ]
+        },
+        {
+          "label": "Cost with a suitable representation",
+          "values": [
+            "O(1) linked operations or amortized O(1) array push.",
+            "O(1) linked operations or amortized O(1) circular-buffer operations; front array shifting is O(n)."
+          ]
+        },
+        {
+          "label": "Memory",
+          "values": [
+            "Tracks nested unfinished work; DFS may store a path/frontier.",
+            "Tracks arrival order or BFS frontier; width can dominate memory."
+          ]
+        },
+        {
+          "label": "Applications",
+          "values": [
+            "Recursion, backtracking, expression parsing and undo.",
+            "BFS, buffering, scheduling and ordered work dispatch."
+          ]
+        }
+      ],
+      "guidance": "Select the order required by the algorithm. Changing a BFS queue to a stack changes traversal behavior and removes the unweighted shortest-path discovery guarantee."
+    },
+    {
+      "id": "bst-hash",
+      "title": "BST vs Hash Table",
+      "topics": [
+        "bst",
+        "hash-tables"
+      ],
+      "rows": [
+        {
+          "label": "Invariant",
+          "values": [
+            "All keys in the left subtree precede the node; right keys follow under the duplicate policy.",
+            "Hash-derived bucket/probe location plus a collision-resolution invariant."
+          ]
+        },
+        {
+          "label": "Lookup",
+          "values": [
+            "O(h); O(log n) requires a balancing or distribution assumption.",
+            "Expected O(1) under suitable hashing/load assumptions; O(n) worst case."
+          ]
+        },
+        {
+          "label": "Order and ranges",
+          "values": [
+            "Inorder traversal is sorted; predecessor, successor and bounded ranges are natural.",
+            "No general sorted-order guarantee; range queries generally require scanning or a second index."
+          ]
+        },
+        {
+          "label": "Key work",
+          "values": [
+            "Each comparison may inspect multiple key bytes.",
+            "Hashing a long key itself costs time; equality still resolves collisions."
+          ]
+        },
+        {
+          "label": "Failure mode",
+          "values": [
+            "An ordinary BST can degenerate into a chain.",
+            "Clustering, excessive load or adversarial collisions can destroy expected performance."
+          ]
+        }
+      ],
+      "guidance": "Use hashing for equality lookup when its assumptions fit. Use balanced ordered trees for order-sensitive queries or logarithmic operation bounds. Neither bound treats arbitrarily long keys as free."
+    },
+    {
+      "id": "avl-red-black",
+      "title": "AVL vs Red-Black Tree",
+      "topics": [
+        "avl-tree",
+        "red-black-tree"
+      ],
+      "rows": [
+        {
+          "label": "Balance invariant",
+          "values": [
+            "Child heights differ by at most one at every node.",
+            "Color rules constrain black height and prevent adjacent red nodes."
+          ]
+        },
+        {
+          "label": "Height",
+          "values": [
+            "O(log n), with a tighter height constraint.",
+            "O(log n), allowing more height variation."
+          ]
+        },
+        {
+          "label": "Repair",
+          "values": [
+            "Maintain heights and rotate after violating balance; deletion may repair many ancestors.",
+            "Maintain colors and black height using recoloring/rotations; repair cases are different."
+          ]
+        },
+        {
+          "label": "Operations",
+          "values": [
+            "Search, insert and delete have O(log n) worst-case time.",
+            "Search, insert and delete have O(log n) worst-case time."
+          ]
+        },
+        {
+          "label": "Engineering tradeoff",
+          "values": [
+            "Tighter height can reduce lookup depth; metadata maintenance and update workload matter.",
+            "Looser balancing can suit mixed workloads; not a universal claim that every update is faster."
+          ]
+        }
+      ],
+      "guidance": "Both provide ordered logarithmic operations. Compare the actual update/read workload and implementation, rather than declaring a winner from asymptotic bounds alone."
+    },
+    {
+      "id": "bfs-dfs",
+      "title": "BFS vs DFS",
+      "topics": [
+        "bfs",
+        "dfs"
+      ],
+      "rows": [
+        {
+          "label": "Frontier",
+          "values": [
+            "FIFO queue; explores by distance in edge count.",
+            "Recursion or LIFO stack; follows a branch before backtracking."
+          ]
+        },
+        {
+          "label": "Time",
+          "values": [
+            "O(V+E) with adjacency lists and one discovery per vertex.",
+            "O(V+E) with adjacency lists and visited-state handling."
+          ]
+        },
+        {
+          "label": "Shortest paths",
+          "values": [
+            "First discovery yields minimum edge count in unweighted graphs.",
+            "First discovered route need not be shortest."
+          ]
+        },
+        {
+          "label": "Memory",
+          "values": [
+            "O(V) worst-case frontier/visited storage.",
+            "O(V) worst-case storage; recursion depth may reach V."
+          ]
+        },
+        {
+          "label": "Applications",
+          "values": [
+            "Unweighted distances, multi-source propagation, levels.",
+            "Cycle structure, finishing times, topological order, low-link algorithms."
+          ]
+        }
+      ],
+      "guidance": "Use BFS for minimum edge count. Use DFS when ancestor relationships and finishing order drive the proof. Representation and marking time matter to both complexity bounds."
+    },
+    {
+      "id": "dijkstra-bellman",
+      "title": "Dijkstra vs Bellman–Ford",
+      "topics": [
+        "dijkstra",
+        "bellman-ford"
+      ],
+      "rows": [
+        {
+          "label": "Weights",
+          "values": [
+            "Requires nonnegative edge weights for the settled-distance proof.",
+            "Allows negative edges; detects reachable negative cycles."
+          ]
+        },
+        {
+          "label": "Strategy",
+          "values": [
+            "Settle the smallest tentative distance using a priority queue.",
+            "Relax all edges repeatedly; paths with more edges propagate across rounds."
+          ]
+        },
+        {
+          "label": "Time",
+          "values": [
+            "O((V+E) log V) with an appropriate heap implementation; duplicate-entry bounds also depend on E.",
+            "O(VE) worst case for the standard algorithm."
+          ]
+        },
+        {
+          "label": "Negative cycles",
+          "values": [
+            "Outside the algorithm contract.",
+            "Distances to vertices reachable through a reachable negative cycle have no finite minimum."
+          ]
+        },
+        {
+          "label": "Memory",
+          "values": [
+            "Distance/predecessor arrays and a heap; duplicate candidates may use O(E) space.",
+            "O(V) auxiliary arrays beyond graph storage."
+          ]
+        }
+      ],
+      "guidance": "Check edge-weight assumptions before picking a faster algorithm. For a DAG, topological relaxation handles negative edges in O(V+E); for unweighted graphs BFS is simpler."
+    },
+    {
+      "id": "fenwick-segment",
+      "title": "Fenwick vs Segment Tree",
+      "topics": [
+        "fenwick-tree",
+        "segment-tree"
+      ],
+      "rows": [
+        {
+          "label": "Stored summaries",
+          "values": [
+            "Overlapping power-of-two prefix blocks selected by lowbit.",
+            "A hierarchy of interval aggregates."
+          ]
+        },
+        {
+          "label": "Query/update time",
+          "values": [
+            "O(log n) prefix sum and point addition.",
+            "O(log n) range aggregation and point update for constant-time combines."
+          ]
+        },
+        {
+          "label": "Algebra",
+          "values": [
+            "Standard range sum uses subtraction of prefixes; ordinary point updates use additive deltas.",
+            "Associative combine with identity supports a monoid; inverses are not generally required."
+          ]
+        },
+        {
+          "label": "Memory",
+          "values": [
+            "O(n) entries, usually compact.",
+            "O(n) nodes/entries with larger representation constants in common layouts."
+          ]
+        },
+        {
+          "label": "Extensions",
+          "values": [
+            "Range-update variants using transformed prefix formulas.",
+            "Lazy propagation requires a compatible update action; persistence and custom summaries need additional invariants."
+          ]
+        }
+      ],
+      "guidance": "Choose Fenwick for simple additive prefix/range work and compact implementation. Choose a segment tree for richer associative summaries or composable range updates. Neither extension is valid without checking its algebra."
+    },
+    {
+      "id": "merge-quick",
+      "title": "Merge Sort vs Quick Sort",
+      "topics": [
+        "merge-sort",
+        "quick-sort"
+      ],
+      "rows": [
+        {
+          "label": "Decomposition",
+          "values": [
+            "Sort two halves, then merge sorted results.",
+            "Partition around a pivot, then sort the resulting regions."
+          ]
+        },
+        {
+          "label": "Time",
+          "values": [
+            "Θ(n log n) for the usual top-down array implementation.",
+            "Expected Θ(n log n) with suitable randomization; Θ(n²) worst case without safeguards."
+          ]
+        },
+        {
+          "label": "Auxiliary memory",
+          "values": [
+            "Typical array merging uses Θ(n) extra storage.",
+            "In-place partitioning plus call stack; naive recursion can reach Θ(n) depth."
+          ]
+        },
+        {
+          "label": "Stability",
+          "values": [
+            "Stable when equal keys are taken from the left half first.",
+            "Typical in-place partitioning is not stable."
+          ]
+        },
+        {
+          "label": "Applications",
+          "values": [
+            "Stable sorting, sequential merging and external-sort designs.",
+            "In-memory sorting with good locality; production hybrids add worst-case safeguards."
+          ]
+        }
+      ],
+      "guidance": "Stability, allocation budget and worst-case guarantees are part of the selection. A textbook quicksort is not interchangeable with a production introspective sort."
+    },
+    {
+      "id": "prim-kruskal",
+      "title": "Prim vs Kruskal",
+      "topics": [
+        "prim",
+        "kruskal"
+      ],
+      "rows": [
+        {
+          "label": "Selection",
+          "values": [
+            "Prim grows a tree from a visited region using a cheapest crossing edge.",
+            "Kruskal processes all edges in nondecreasing weight and joins different components."
+          ]
+        },
+        {
+          "label": "State",
+          "values": [
+            "Best crossing candidates and a visited set, often managed by a heap.",
+            "A disjoint-set structure tracking the current forest components."
+          ]
+        },
+        {
+          "label": "Time",
+          "values": [
+            "O(E log V) with an adjacency-list heap approach, or O(V²) with a dense matrix.",
+            "O(E log E) sorting plus near-linear DSU operations."
+          ]
+        },
+        {
+          "label": "Disconnected input",
+          "values": [
+            "Restart from unvisited vertices to obtain a minimum spanning forest.",
+            "Naturally produces a minimum spanning forest after processing all edges."
+          ]
+        },
+        {
+          "label": "Correctness",
+          "values": [
+            "A light edge across the current cut is safe.",
+            "A light edge joining two forest components is safe; cycles are rejected."
+          ]
+        }
+      ],
+      "guidance": "Both solve undirected spanning-tree/forest problems, not shortest paths. Compare graph density, input representation, and the cost of sorting versus maintaining a frontier."
     }
   ]
 }

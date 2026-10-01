@@ -35,3 +35,23 @@ Not yet delivered: full lessons for every advanced curriculum entry; all request
 Browser tests exercise all four reference lessons, starter failures and correct submissions, mastery and completion, timeline steps and predictions, tutor guidance, resource saving, notes, all workspace routes, and mobile overflow. Compiler tests execute C++, Java and TypeScript examples; property tests compare Python algorithms to independent small-input oracles. The grading tests exercise Python and C++ `__check` contracts. Tests use temporary account data, never the real database.
 
 Final verification on this checkout: 114 pytest tests passed; Chromium desktop/mobile smoke checks passed; JavaScript syntax and diff whitespace checks passed. The only pytest warning is the existing Starlette/httpx TestClient deprecation.
+
+## Foundation expansion — 2026-10-01
+
+The follow-on audit is in `DSA_EXPANSION_AUDIT.md`. The existing four reference
+lessons are joined by Algorithmic Thinking, Complexity and Arrays. These add
+original proof-oriented explanations, Python/C++/Java/TypeScript/JavaScript
+examples, runnable exercises, single/multiple-answer quizzes, and three teaching
+trace adapters. Two upgraded topics preserve their legacy completion IDs.
+
+The catalog now has nested structure families, cross-listing without duplicated
+learning records, and nine side-by-side comparisons. Selected learning paths
+prioritize prerequisite-ready ancestors and topics. Catalog validation checks
+navigation relationships and the published lesson reader contract. A standalone
+validation command supports editing/publishing JSON revisions.
+
+Still outstanding from the full master specification: complete teaching units
+for most core and advanced topics, the full pattern library, additional quiz
+interaction types, unified full-text search, an in-app content editor, and
+arbitrary-code stepping. The new catalog entries are a roadmap, not a claim that
+all advanced structures have been implemented. Fibonacci Tree remains unresolved.
