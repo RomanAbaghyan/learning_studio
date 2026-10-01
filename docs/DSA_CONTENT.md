@@ -106,6 +106,16 @@ New trace kinds:
   Starts empty, appends all values, and exposes live size, capacity, copies,
   element writes and simultaneous old/new buffers. Allocation initialization
   is not counted as an element write.
+- `linked-list`: `values` (at most 32), `mode` of `reverse`, `insert`, `erase`,
+  `find` or `merge`. Insert takes `index` in `[0,n]` and a finite `value`; erase
+  takes `index` in `[0,n)`; find takes a finite `target`. Merge additionally
+  takes `other` (at most 32); both inputs must be nondecreasing. The adapter
+  creates distinct node handles for both chains and preserves them through
+  stable consuming merge. Empty reversal, search and merge are valid.
+  Conceptual allocation counters count operation-created nodes/sentinels,
+  excluding the existing input chain. Each immutable snapshot exposes local
+  roots, next links, active nodes and detached live nodes. The shared renderer
+  draws directed successor arrows and provides a semantic node table.
 
 The lab reads `lesson.trace.kind` instead of assuming the topic ID is an adapter
 name. All adapters emit the existing immutable frame protocol. The array renderer

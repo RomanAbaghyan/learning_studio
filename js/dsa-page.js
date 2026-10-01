@@ -135,7 +135,7 @@
         const data=await lesson(id);if(version!==routeVersion||request!==generation)return;
         const kind=data.trace.kind,size=Math.max(0,Math.min(24,Math.floor(Number(root.querySelector('[data-size]').value)||0))),pattern=root.querySelector('[data-pattern]').value;
         let input=JSON.parse(JSON.stringify(data.trace.input||DSATraces.defaults[kind]));
-        const sequence=['binary-search','linear-search','avl-tree','dynamic-array'].includes(kind),counting=kind==='operation-count';
+        const sequence=['binary-search','linear-search','avl-tree','dynamic-array','linked-list'].includes(kind),counting=kind==='operation-count';
         root.querySelector('[data-pattern]').disabled=!sequence;root.querySelector('[data-size]').disabled=!sequence&&!counting;
         const values=Array.from({length:size},(_,i)=>pattern==='duplicates'?i%3:pattern==='adversarial'?i:Math.floor(Math.random()*100));
         if(pattern==='sorted'||pattern==='nearly sorted')values.sort((a,b)=>a-b);
@@ -145,8 +145,9 @@
         if(kind==='linear-search')input={values,target:pattern==='adversarial'?-1:values[Math.floor(size/2)]??0};
         if(kind==='avl-tree')input={values,delete:values.length?[values[0]]:[]};
         if(kind==='dynamic-array')input={...input,values};
+        if(kind==='linked-list')input={...input,values};
         if(counting)input={...input,n:size};
-        root.querySelector('[data-lab-note]').textContent=kind==='binary-search'?'Input is sorted to satisfy binary search. Use JSON to test a violated precondition.':kind==='linear-search'?'The adversarial pattern uses an absent target, requiring a full scan.':kind==='avl-tree'?'Insertion order affects rotations; duplicates use set semantics.':kind==='dynamic-array'?'Values change the live prefix; resizing depends on size and capacity, not value order.':counting?'Change mode in JSON to linear, triangular or doubling. Counters measure actual loop-body executions.':'Graph and DP inputs are configured in JSON below.';
+        root.querySelector('[data-lab-note]').textContent=kind==='binary-search'?'Input is sorted to satisfy binary search. Use JSON to test a violated precondition.':kind==='linear-search'?'The adversarial pattern uses an absent target, requiring a full scan.':kind==='avl-tree'?'Insertion order affects rotations; duplicates use set semantics.':kind==='dynamic-array'?'Values change the live prefix; resizing depends on size and capacity, not value order.':kind==='linked-list'?'Generated inputs reverse an ordinary chain. Configure JSON for find, insert, erase or stable sorted merge; node handles remain distinct even when values repeat.':counting?'Change mode in JSON to linear, triangular or doubling. Counters measure actual loop-body executions.':'Graph and DP inputs are configured in JSON below.';
         timeline=DSATimeline.mount(host,kind,input,id,(dimension,evidence,passed)=>DSAStore.record(id,dimension,evidence,passed));
       }catch(error){if(version===routeVersion&&request===generation)host.textContent=error.message;}
     }

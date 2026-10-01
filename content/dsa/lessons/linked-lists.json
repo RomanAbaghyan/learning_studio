@@ -1,0 +1,357 @@
+{
+  "id": "linked-lists",
+  "title": "Linked Lists: Identity, Links and Ownership",
+  "summary": "Build and reason about linked sequences, then trace pointer updates without losing nodes. Connect asymptotic costs to ownership, allocation and cache behavior.",
+  "objectives": [
+    "Distinguish the list ADT from an array or linked representation",
+    "Derive traversal and indexed-update costs instead of assuming constant-time insertion",
+    "Implement find, insertion, deletion, reversal and stable sorted merge",
+    "Prove reversal using a partition invariant and decreasing suffix length",
+    "Maintain singly, doubly, circular and sentinel representation invariants",
+    "Explain identity, allocation, reclamation and locality tradeoffs"
+  ],
+  "sections": [
+    {
+      "id": "motivation",
+      "title": "Why links exist: stable objects and local edits",
+      "body": "An array represents order by adjacent slots. Inserting in its middle must move later entries. A linked list represents order by explicit successor links, so a local edit can change a few links without moving the other payload objects. This is useful when a system already holds a handle to an edit location and needs stable identities: a linked queue, an intrusive scheduler list, or the recency chain of an LRU cache. A linked list does not make finding that location free. If a workload mostly indexes or scans, an array often gives better memory use and locality."
+    },
+    {
+      "id": "adt",
+      "title": "The sequence ADT and its contract",
+      "body": "A list is an ordered finite sequence, not necessarily a linked representation. Its ADT supports traversal, search, insertion at boundaries 0 through n, and removal at element positions 0 through n−1. Define whether duplicates are allowed, which equality relation is used, and whether search returns the first match. The examples allow repeated integers, return -1 on absence, and raise an index error on an invalid edit. An insertion at n appends; erasing at n is invalid. Returning a new head is part of every operation that can change the first node. Assign head = operation(head, ...).\n\nReference functions assume finite acyclic singly linked chains. Merge additionally requires nondecreasing, disjoint input chains; it consumes them by reusing their nodes. These are preconditions, not runtime validation done on every call. The ordinary-list invariant differs deliberately from the circular-list invariant described later."
+    },
+    {
+      "id": "representation",
+      "title": "Nodes, links, head and tail",
+      "body": "A node contains a payload and a successor link. head names the first node, or null for an empty list. Following next visits sequence order; null terminates the final node. A handle is an identity, not an integer position: two nodes with value 7 are still distinct objects. The timeline uses n1, n2 and so on as conceptual handles. Their order in the allocation table says nothing about real physical addresses.\n\nA cached tail gives direct access to the last node, making append constant time under a constant-cost allocation model. It must be updated on empty insertion, deleting the last element, clearing and reversal. A singly linked tail cannot jump to its predecessor, so removing the final node still requires a scan unless that predecessor is supplied. A cached length gives O(1) size queries only if every edit maintains it."
+    },
+    {
+      "id": "invariant",
+      "title": "Representation invariants",
+      "body": "For an ordinary singly linked list: head is null exactly when the sequence is empty; every next is null or a valid live node; following head reaches each owned node exactly once and terminates at null. If size and tail are stored, reachable node count equals size, tail is the last reachable node, and tail.next is null. A cycle violates the termination property even when every pointer is locally valid.\n\nSeparate ownership from reachability. A detached node may still be owned temporarily during an operation. External aliases can outlive removal in a managed language; in C++, deleting the node makes such aliases dangling. The lesson uses exclusive ownership of each ordinary chain. Sharing a tail between two owned lists breaks the deletion and consuming-merge contracts."
+    },
+    {
+      "id": "traversal",
+      "title": "Traversal, indexing and first-match find",
+      "body": "Start curr = head, repeatedly process curr.value, and advance curr = curr.next. The invariant for first-match search says all nodes before curr have been examined and differ from target. After k advances curr names position k, if it exists. At equality this is the first occurrence; at null all candidates are excluded. The unvisited suffix length decreases each iteration, proving termination for acyclic input.\n\nReaching position i takes i successor advances from head; there is no base + i × stride calculation. A loop that calls indexed get(i) from head for every i uses 0+1+...+(n−1) link advances, hence Θ(n²), while a single advancing cursor uses Θ(n). An absent-target search performs n value comparisons. Long-string equality or allocation costs require a richer cost model than unit-cost integers."
+    },
+    {
+      "id": "insertion",
+      "title": "Insertion: preserve the successor, then publish",
+      "body": "Given predecessor pred, save its old successor s, construct node(value, s), then set pred.next = node. The old suffix remains reachable and a single node is inserted between pred and s. For an indexed insertion, locate pred first; the scan is Θ(i), while the relinking is O(1). At position zero a temporary sentinel whose next is head serves as pred, so the same code works for an empty list or a new head. The sentinel payload is ignored and is not an element.\n\nAllocate and initialize before publishing the new link. If allocation fails, the original chain remains unchanged. Setting pred.next to a new node before preserving its old successor loses the suffix. With a cached tail, inserting after the old tail or into an empty list must update tail. A sentinel simplifies boundary cases but does not eliminate tail or size maintenance."
+    },
+    {
+      "id": "deletion",
+      "title": "Deletion: bypass, maintain metadata, then release",
+      "body": "Given a predecessor, let victim = pred.next. Read victim.next while victim is live, set pred.next = victim.next, then release victim according to the ownership model. A temporary sentinel makes deletion at zero use the same predecessor logic. Empty deletion, a negative index and an index equal to size are errors. A removed tail requires tail = pred, or null if no elements remain.\n\nC++ must delete each removed owned node exactly once and never read victim after deletion. Python/Java/JavaScript use garbage collection: unlinking is not a promise of immediate reclamation. These examples clear a removed managed node’s next reference so an external alias does not unnecessarily retain the suffix. The copy-successor trick sometimes advertised as O(1) deletion changes node identity and fails for the tail; it is not a substitute for this predecessor contract."
+    },
+    {
+      "id": "reverse",
+      "title": "Reversal: three pointers and a moving boundary",
+      "body": "Initialize prev = null and curr = head. In each iteration, save successor = curr.next, reverse curr.next to prev, then advance prev = curr and curr = successor. Return prev as the new head. Saving the successor is essential because writing curr.next destroys the only forward link stored in that node.\n\nFor [10,20,30], the first link change makes node 10 point to null while successor still names node 20. After advancing, prev reaches [10] and curr reaches [20,30]. The next iteration makes 20 point to 10. The final prev chain is [30,20,10]. Play, seek and step backward to inspect these intermediate states; the original head stays at node 10 until the final publication. The memory table also shows nodes not currently reachable through head alone.\n\nConfigure the trace with {\"values\":[10,20,30],\"mode\":\"reverse\"}. Other modes use {\"values\":[10,30],\"mode\":\"insert\",\"index\":1,\"value\":20}, {\"values\":[10,20,30],\"mode\":\"erase\",\"index\":1}, or {\"values\":[7,2,7],\"mode\":\"find\",\"target\":7}. Predictions ask which pointer must be saved or published."
+    },
+    {
+      "id": "correctness",
+      "title": "Proof of reversal and termination",
+      "body": "At every loop entry, let the original sequence be P followed by S. prev reaches exactly reverse(P), curr reaches exactly S, and the two acyclic chains are disjoint and together contain every original node with its original payload. Initialization uses empty P. Save the first node’s successor in S; redirect that node to prev; then advance. The new prefix is P followed by that node, and its reverse is that node followed by reverse(P). The remaining suffix loses exactly one node, so the invariant is preserved.\n\nThe nonnegative suffix length decreases by one each iteration. At curr = null, S is empty and prev reaches the reverse of the entire original sequence. Returning prev therefore proves the required order, no losses or duplicates, identity preservation, and termination. A proof stated only as “values are reversed” misses the ownership obligations. Within an iteration, saved local pointers maintain reachability even before the loop-entry partition is restored."
+    },
+    {
+      "id": "merge",
+      "title": "Stable merge of two sorted lists",
+      "body": "Given sorted disjoint chains a and b, attach the smaller front node to a growing result; on equal keys take from a first. Advance only the selected input pointer and the result tail. When one chain is empty, attach the other suffix in one link assignment. A dummy result sentinel handles an initially empty result.\n\nThe invariant says the result prefix is sorted, contains exactly the already consumed nodes, and its last value is at most either remaining front value. Choosing the smaller front is safe because sortedness prevents a later node in either chain from preceding it. Left-first equality preserves each input’s order and places equal-key nodes from a before those from b. Each choice consumes one node, proving termination. Time is O(m+n) worst case, with O(1) auxiliary node storage. The result reuses nodes: the old inputs must no longer be used as independent owned lists.\n\nConfigure the shared timeline with {\"values\":[1,3],\"other\":[2,3],\"mode\":\"merge\"}. Handles n1/n2 belong to the left chain and b1/b2 to the right. On equal fronts the trace attaches the left node first. The sorted output prefix ends at tail; before an input is exhausted, tail.next can still reach an unconsumed input suffix. The pointer table makes that temporary sharing visible."
+    },
+    {
+      "id": "doubly",
+      "title": "Doubly linked lists and bidirectional invariants",
+      "body": "Store prev as well as next. For every adjacent pair u and v, u.next = v implies v.prev = u, and conversely. With null endpoints, head.prev = null and tail.next = null. Inserting x between p and q updates x.prev = p, x.next = q, p.next = x, and q.prev = x, with endpoint cases if p or q is null. Deleting a known live x reconnects x.prev.next = x.next and x.next.prev = x.prev before retiring x. This allows O(1) removal given the node handle without searching for a predecessor.\n\nUse a circular sentinel root to unify endpoint cases: initialize root.next = root.prev = root; insert before q with p = q.prev and the four assignments above; remove a non-sentinel node with the two neighbor assignments. Never remove root or count it as an element. Empty means root.next = root. Both links must agree after each completed operation; updating only one direction can make forward traversal look correct while backward traversal fails. The extra predecessor field spends per-node memory to buy reverse traversal and known-node deletion."
+    },
+    {
+      "id": "circular",
+      "title": "Circular lists: termination needs a new rule",
+      "body": "A circular singly linked list closes tail.next back to head. For nonempty input, traverse with a do/process/advance loop until curr == head again, or stop after a maintained size count. A while curr != null loop never terminates. An empty representation needs an explicit convention such as head = null; a one-node circular list has head.next = head.\n\nCircular lists model round-robin access and can represent rings of active tasks. Removing the only element must restore the empty convention. In a sentinel ring, traversal stops at the sentinel and skips its payload. Intentional circularity is distinct from an accidental cycle in an ordinary list: cycle detection must be interpreted relative to the declared representation."
+    },
+    {
+      "id": "memory",
+      "title": "Memory behavior, locality and realistic costs",
+      "body": "A packed array stores adjacent fixed-width elements; linked nodes store payload plus one or two links, padding and allocator metadata. A rough C++ singly node with a 4-byte integer and an 8-byte pointer may occupy 16 bytes due to alignment on one ABI, before allocation overhead; this is an example, not a portable guarantee. Python nodes contain references and object metadata; Java/JavaScript layout depends on the runtime. Count links and allocations conceptually rather than inventing byte-accurate addresses.\n\nFollowing next creates dependent loads: the address of the next node is unavailable until the current node is read. Dispersed nodes can miss caches and limit prefetching. A pool allocator or an array of nodes with index handles can improve locality while preserving logical links. Removing a node invalidates its identity in explicit-memory models; allocator reuse can even recycle its address. Concurrent mutation needs a separate synchronization and reclamation design. The reference implementation is single-threaded."
+    },
+    {
+      "id": "complexity-proof",
+      "title": "Where each bound comes from",
+      "body": "With n nodes and fixed-cost integer comparisons, a traversal or reversal performs n visits; reversal writes one successor link per node and stores a fixed number of local references. Its Θ(n) time and Θ(1) auxiliary space exclude the existing n nodes. Indexed insert at i performs i predecessor advances plus fixed relinking and one node allocation. Indexed erase at i performs i advances plus fixed bypass and reclamation. Invalid far-out indices stop at null after at most n advances.\n\nO(1) insertion or deletion claims must state that a valid predecessor (singly) or node (doubly) is already supplied, and usually model allocation as constant cost. They do not imply O(1) latency from a general-purpose allocator. A whole operation “find this value and remove it” is O(n). An n-node linked representation uses Θ(n) storage, yet has larger constants than a compact array. Singly tail deletion is Θ(n) from head even with a cached tail."
+    },
+    {
+      "id": "edge-cases",
+      "title": "Edge cases and failure contracts",
+      "body": "Check empty input, one node, two nodes, all equal values, head and tail edits, insertion at size, deletion at size, negative indices, target at index zero, and absent target. Reversing twice must restore the exact original node order and links. No output link may name a released node. Invalid indexed edits must leave the original chain unchanged.\n\nThe reference operations do not accept cyclic or shared-tail input. A caller can validate with a visited set (O(n) memory) or Floyd’s fast/slow cycle detection (O(1) auxiliary memory). Fast/slow detects a cycle but does not establish disjoint ownership of two merge inputs. Reference Python indices are integers by contract; JavaScript checks integrality explicitly because its number type also holds fractions."
+    },
+    {
+      "id": "mistakes",
+      "title": "Debugging pointer errors",
+      "body": "Discarding curr.next before saving it loses the suffix in reversal. Failing to assign the returned head leaves the caller at an interior or removed node. Comparing node payloads to detect the end of a circular traversal fails when values repeat; compare identities. Forgetting a reverse-direction update violates a doubly linked invariant. In C++, reading victim.next after delete is use-after-free; returning a pointer to a stack sentinel is also invalid. Return sentinel.next instead.\n\nDebug the earliest violating transition. Keep a set of original node identities in tests, inspect the roots held by local variables, and bound traversal so a cycle reports failure instead of hanging. The practice checks reject copying values into new nodes or changing payloads as a shortcut: the contract requires rewiring the original chain."
+    },
+    {
+      "id": "comparison",
+      "title": "Choose by workload, then explore variants",
+      "body": "Choose an array for frequent indexed reads and cache-friendly iteration. Choose a linked chain when edits already have node handles, node identity must stay stable, or a linked stack/queue representation fits the workload. For an LRU cache, a hash map supplies handles and a doubly linked chain maintains recency: the combination removes the O(n) search. For queue workloads a circular array deque can avoid per-node allocation.\n\nA self-organizing list changes order to exploit access locality; a skip list adds probabilistic search layers; an unrolled list stores blocks to trade local shifts for locality; an XOR list encodes neighbor addresses at the cost of traversal state and memory-model constraints. These are separate forthcoming units with explicit prerequisites. Ordinary linked-list code is not an implementation of those structures."
+    },
+    {
+      "id": "exercises",
+      "title": "Reasoning exercises and advanced challenges",
+      "body": "Foundation: draw all pointer values after the first two steps of reversing [4,4,9], distinguishing equal-valued nodes. Implement predecessor-based insert and erase, including empty and last-element cases. Prove that invalid index validation happens before any existing link is modified.\n\nIntermediate: implement stable consuming merge and verify order with (key, original-source, position) records. Design a doubly linked sentinel deque and assert bidirectional invariants after every operation. Implement fast/slow cycle detection and explain why comparing node values is insufficient.\n\nAdvanced: reverse only [left,right) in place while preserving outside node identity, using a sentinel and boundary reconnection. Implement bottom-up merge sort on a linked list with O(1) auxiliary node storage; count link operations at each doubling pass. Compare pooled and individual allocation for scan-heavy versus handle-edit workloads, reporting measured timings separately from theoretical bounds."
+    }
+  ],
+  "pseudocode": "prev ← null; curr ← head\nwhile curr ≠ null:\n    successor ← curr.next\n    curr.next ← prev\n    prev ← curr\n    curr ← successor\nreturn prev",
+  "implementations": {
+    "python": "class Node:\n    def __init__(self, value, next=None):\n        self.value, self.next = value, next\n\ndef make_list(values):\n    head = None\n    for value in reversed(values):\n        head = Node(value, head)\n    return head\n\ndef to_values(head):\n    result = []\n    while head is not None:\n        result.append(head.value)\n        head = head.next\n    return result\n\ndef find_index(head, target):\n    i = 0\n    while head is not None:\n        if head.value == target:\n            return i\n        head, i = head.next, i + 1\n    return -1\n\ndef insert_at(head, index, value):\n    if index < 0:\n        raise IndexError('index')\n    sentinel = Node(None, head)\n    pred = sentinel\n    for _ in range(index):\n        if pred.next is None:\n            raise IndexError('index')\n        pred = pred.next\n    pred.next = Node(value, pred.next)\n    return sentinel.next\n\ndef erase_at(head, index):\n    if index < 0:\n        raise IndexError('index')\n    sentinel = Node(None, head)\n    pred = sentinel\n    for _ in range(index):\n        if pred.next is None:\n            raise IndexError('index')\n        pred = pred.next\n    victim = pred.next\n    if victim is None:\n        raise IndexError('index')\n    pred.next = victim.next\n    victim.next = None  # detached aliases do not retain the suffix\n    return sentinel.next\n\ndef reverse_list(head):\n    prev, curr = None, head\n    while curr is not None:\n        successor = curr.next\n        curr.next = prev\n        prev, curr = curr, successor\n    return prev\n\ndef merge_sorted(a, b):\n    # Preconditions: sorted, acyclic, disjoint chains; consumes both inputs.\n    sentinel = Node(None)\n    tail = sentinel\n    while a is not None and b is not None:\n        if a.value <= b.value:\n            tail.next, a = a, a.next\n        else:\n            tail.next, b = b, b.next\n        tail = tail.next\n    tail.next = a if a is not None else b\n    return sentinel.next\n\nassert to_values(reverse_list(make_list([10, 20, 30]))) == [30, 20, 10]\nassert to_values(merge_sorted(make_list([1, 3]), make_list([2, 3]))) == [1, 2, 3, 3]\n",
+    "cpp": "#include <vector>\n#include <stdexcept>\n#include <cassert>\nusing namespace std;\nstruct Node {\n    int value;\n    Node* next;\n    Node(int v, Node* n=nullptr): value(v), next(n) {}\n};\n// Ownership: caller owns one acyclic chain. No shared tails or concurrent access.\nvoid clear_list(Node*& head) {\n    while (head) { Node* next=head->next; delete head; head=next; }\n}\nNode* make_list(const vector<int>& values) {\n    Node* head=nullptr;\n    try { for (auto it=values.rbegin(); it!=values.rend(); ++it) head=new Node(*it, head); }\n    catch (...) { clear_list(head); throw; }\n    return head;\n}\nvector<int> to_values(Node* head) {\n    vector<int> values;\n    for (; head; head=head->next) values.push_back(head->value);\n    return values;\n}\nint find_index(Node* head, int target) {\n    int i=0;\n    for (; head; head=head->next, ++i) if (head->value==target) return i;\n    return -1; // teaching chains have at most 10,000 elements\n}\nNode* insert_at(Node* head, int index, int value) {\n    if (index<0) throw out_of_range(\"index\");\n    Node sentinel(0, head); Node* pred=&sentinel;\n    for (int i=0; i<index; ++i) {\n        if (!pred->next) throw out_of_range(\"index\");\n        pred=pred->next;\n    }\n    pred->next=new Node(value, pred->next);\n    return sentinel.next;\n}\nNode* erase_at(Node* head, int index) {\n    if (index<0) throw out_of_range(\"index\");\n    Node sentinel(0, head); Node* pred=&sentinel;\n    for (int i=0; i<index; ++i) {\n        if (!pred->next) throw out_of_range(\"index\");\n        pred=pred->next;\n    }\n    Node* victim=pred->next;\n    if (!victim) throw out_of_range(\"index\");\n    pred->next=victim->next;\n    delete victim; // external aliases to this node are now invalid\n    return sentinel.next;\n}\nNode* reverse_list(Node* head) {\n    Node* prev=nullptr;\n    while (head) {\n        Node* successor=head->next;\n        head->next=prev;\n        prev=head; head=successor;\n    }\n    return prev;\n}\nNode* merge_sorted(Node* a, Node* b) {\n    // Sorted, acyclic, disjoint inputs. Transfer their ownership to the result.\n    Node sentinel(0); Node* tail=&sentinel;\n    while (a && b) {\n        if (a->value<=b->value) { tail->next=a; a=a->next; }\n        else { tail->next=b; b=b->next; }\n        tail=tail->next;\n    }\n    tail->next=a?a:b;\n    return sentinel.next;\n}\nint main() {\n    Node* head=make_list({10,20,30});\n    head=insert_at(head,1,15); head=erase_at(head,2);\n    assert(find_index(head,15)==1);\n    head=reverse_list(head);\n    assert(to_values(head)==vector<int>({30,15,10}));\n    clear_list(head);\n    Node* merged=merge_sorted(make_list({1,3}),make_list({2,3}));\n    assert(to_values(merged)==vector<int>({1,2,3,3}));\n    clear_list(merged);\n}\n",
+    "java": "import java.util.*;\nclass LinkedLists {\n    static class Node {\n        int value; Node next;\n        Node(int value, Node next) { this.value=value; this.next=next; }\n    }\n    static Node makeList(int[] values) {\n        Node head=null;\n        for(int i=values.length-1;i>=0;i--) head=new Node(values[i],head);\n        return head;\n    }\n    static List<Integer> toValues(Node head) {\n        List<Integer> out=new ArrayList<>();\n        for(;head!=null;head=head.next) out.add(head.value);\n        return out;\n    }\n    static int findIndex(Node head,int target) {\n        int i=0;\n        for(;head!=null;head=head.next,i++) if(head.value==target) return i;\n        return -1;\n    }\n    static Node predecessor(Node sentinel,int index) {\n        if(index<0) throw new IndexOutOfBoundsException();\n        Node pred=sentinel;\n        for(int i=0;i<index;i++) {\n            if(pred.next==null) throw new IndexOutOfBoundsException();\n            pred=pred.next;\n        }\n        return pred;\n    }\n    static Node insertAt(Node head,int index,int value) {\n        Node sentinel=new Node(0,head), pred=predecessor(sentinel,index);\n        pred.next=new Node(value,pred.next);\n        return sentinel.next;\n    }\n    static Node eraseAt(Node head,int index) {\n        Node sentinel=new Node(0,head), pred=predecessor(sentinel,index);\n        Node victim=pred.next;\n        if(victim==null) throw new IndexOutOfBoundsException();\n        pred.next=victim.next; victim.next=null;\n        return sentinel.next;\n    }\n    static Node reverseList(Node head) {\n        Node prev=null;\n        while(head!=null) {\n            Node successor=head.next;\n            head.next=prev; prev=head; head=successor;\n        }\n        return prev;\n    }\n    static Node mergeSorted(Node a,Node b) {\n        Node sentinel=new Node(0,null), tail=sentinel;\n        while(a!=null && b!=null) {\n            if(a.value<=b.value) { tail.next=a; a=a.next; }\n            else { tail.next=b; b=b.next; }\n            tail=tail.next;\n        }\n        tail.next=a!=null?a:b;\n        return sentinel.next;\n    }\n    public static void main(String[] args) {\n        Node head=makeList(new int[]{10,20,30});\n        head=insertAt(head,1,15); head=eraseAt(head,2);\n        if(findIndex(head,15)!=1) throw new AssertionError(\"find\");\n        head=reverseList(head);\n        if(!toValues(head).equals(Arrays.asList(30,15,10))) throw new AssertionError(\"reverse\");\n        if(!toValues(mergeSorted(makeList(new int[]{1,3}),makeList(new int[]{2,3}))).equals(Arrays.asList(1,2,3,3))) throw new AssertionError(\"merge\");\n    }\n}\n",
+    "typescript": "// ListNode avoids the browser DOM Node name. Inputs are acyclic disjoint chains.\nclass ListNode {\n  constructor(public value: number, public next: ListNode | null = null) {}\n}\nfunction makeList(values: number[]): ListNode | null {\n  let head: ListNode | null = null;\n  for (let i = values.length - 1; i >= 0; i--) head = new ListNode(values[i], head);\n  return head;\n}\nfunction toValues(head: ListNode | null): number[] {\n  const out: number[] = [];\n  for (; head !== null; head = head.next) out.push(head.value);\n  return out;\n}\nfunction findIndex(head: ListNode | null, target: number): number {\n  let i = 0;\n  for (; head !== null; head = head.next, i++) if (head.value === target) return i;\n  return -1;\n}\nfunction predecessor(sentinel: ListNode, index: number): ListNode {\n  if (!Number.isInteger(index) || index < 0) throw new RangeError('index');\n  let pred = sentinel;\n  for (let i = 0; i < index; i++) {\n    if (pred.next === null) throw new RangeError('index');\n    pred = pred.next;\n  }\n  return pred;\n}\nfunction insertAt(head: ListNode | null, index: number, value: number): ListNode | null {\n  const sentinel = new ListNode(0, head), pred = predecessor(sentinel, index);\n  pred.next = new ListNode(value, pred.next);\n  return sentinel.next;\n}\nfunction eraseAt(head: ListNode | null, index: number): ListNode | null {\n  const sentinel = new ListNode(0, head), pred = predecessor(sentinel, index);\n  const victim = pred.next;\n  if (victim === null) throw new RangeError('index');\n  pred.next = victim.next; victim.next = null;\n  return sentinel.next;\n}\nfunction reverseList(head: ListNode | null): ListNode | null {\n  let prev: ListNode | null = null;\n  while (head !== null) {\n    const successor: ListNode | null = head.next;\n    head.next = prev; prev = head; head = successor;\n  }\n  return prev;\n}\nfunction mergeSorted(a: ListNode | null, b: ListNode | null): ListNode | null {\n  const sentinel = new ListNode(0);\n  let tail = sentinel;\n  while (a !== null && b !== null) {\n    if (a.value <= b.value) { tail.next = a; a = a.next; }\n    else { tail.next = b; b = b.next; }\n    tail = tail.next;\n  }\n  tail.next = a !== null ? a : b;\n  return sentinel.next;\n}\nconsole.log(toValues(reverseList(makeList([10,20,30])))); // [30,20,10]\n",
+    "javascript": "class ListNode {\n  constructor(value, next = null) { this.value = value; this.next = next; }\n}\nfunction makeList(values) {\n  let head = null;\n  for (let i = values.length - 1; i >= 0; i--) head = new ListNode(values[i], head);\n  return head;\n}\nfunction toValues(head) {\n  const out = [];\n  for (; head !== null; head = head.next) out.push(head.value);\n  return out;\n}\nfunction findIndex(head, target) {\n  let i = 0;\n  for (; head !== null; head = head.next, i++) if (head.value === target) return i;\n  return -1;\n}\nfunction predecessor(sentinel, index) {\n  if (!Number.isInteger(index) || index < 0) throw new RangeError('index');\n  let pred = sentinel;\n  for (let i = 0; i < index; i++) {\n    if (pred.next === null) throw new RangeError('index');\n    pred = pred.next;\n  }\n  return pred;\n}\nfunction insertAt(head, index, value) {\n  const sentinel = new ListNode(0, head), pred = predecessor(sentinel, index);\n  pred.next = new ListNode(value, pred.next);\n  return sentinel.next;\n}\nfunction eraseAt(head, index) {\n  const sentinel = new ListNode(0, head), pred = predecessor(sentinel, index);\n  const victim = pred.next;\n  if (victim === null) throw new RangeError('index');\n  pred.next = victim.next; victim.next = null;\n  return sentinel.next;\n}\nfunction reverseList(head) {\n  let prev = null;\n  while (head !== null) {\n    const successor = head.next;\n    head.next = prev; prev = head; head = successor;\n  }\n  return prev;\n}\nfunction mergeSorted(a, b) {\n  const sentinel = new ListNode(0);\n  let tail = sentinel;\n  while (a !== null && b !== null) {\n    if (a.value <= b.value) { tail.next = a; a = a.next; }\n    else { tail.next = b; b = b.next; }\n    tail = tail.next;\n  }\n  tail.next = a !== null ? a : b;\n  return sentinel.next;\n}\nconsole.log(toValues(reverseList(makeList([10,20,30]))));\n"
+  },
+  "complexity": [
+    {
+      "operation": "Traverse / first-match find",
+      "time": "Θ(n) worst; Θ(1) best on a nonempty matching head",
+      "space": "Θ(1) auxiliary",
+      "why": "Follow up to n successor links and compare each visited fixed-width value."
+    },
+    {
+      "operation": "Indexed insert / erase at i",
+      "time": "Θ(i+1) for a valid index",
+      "space": "Θ(1) auxiliary; one new payload node for insert",
+      "why": "Locate the predecessor with i advances, then perform fixed relinking; allocation is modeled as O(1)."
+    },
+    {
+      "operation": "Insert after known predecessor",
+      "time": "Θ(1) under constant-cost allocation",
+      "space": "Θ(1) extra node",
+      "why": "Initialize one new node and replace one predecessor link without scanning."
+    },
+    {
+      "operation": "Doubly linked removal of known live node",
+      "time": "Θ(1)",
+      "space": "Θ(1) auxiliary",
+      "why": "Its prev and next identify both neighbors; reconnect them without a search."
+    },
+    {
+      "operation": "Reverse singly chain",
+      "time": "Θ(n)",
+      "space": "Θ(1) auxiliary",
+      "why": "Visit and rewire each node once; a fixed number of local roots preserves every node."
+    },
+    {
+      "operation": "Stable consuming merge",
+      "time": "O(m+n) worst",
+      "space": "Θ(1) auxiliary",
+      "why": "Each choice consumes one node; one remaining suffix is attached without copying."
+    },
+    {
+      "operation": "Linked representation storage",
+      "time": "Not an operation-time bound",
+      "space": "Θ(n) total",
+      "why": "Each node stores its payload and links plus runtime-dependent allocation overhead."
+    }
+  ],
+  "quiz": [
+    {
+      "id": "cost",
+      "type": "single",
+      "prompt": "A singly linked list has a tail pointer but no predecessor links. What does removing its last node cost from head?",
+      "options": [
+        "O(1) always",
+        "Θ(n) in the worst case",
+        "Θ(log n)",
+        "O(n²) always"
+      ],
+      "answer": 1,
+      "explanation": "The tail does not identify the predecessor whose next link must change.",
+      "dimension": "Analyze"
+    },
+    {
+      "id": "save",
+      "type": "single",
+      "prompt": "Which action must precede curr.next = prev during reversal?",
+      "options": [
+        "Allocate a replacement node",
+        "Save the original curr.next",
+        "Sort the payloads",
+        "Delete curr"
+      ],
+      "answer": 1,
+      "explanation": "The old successor must remain reachable after its link is overwritten.",
+      "dimension": "Debug"
+    },
+    {
+      "id": "head",
+      "type": "single",
+      "prompt": "After reversing n1 → n2 → n3, what should the caller store as head?",
+      "options": [
+        "n1",
+        "n2",
+        "n3",
+        "null"
+      ],
+      "answer": 2,
+      "explanation": "The old final node becomes the new head; the old head becomes the tail.",
+      "dimension": "Trace"
+    },
+    {
+      "id": "identity",
+      "type": "single",
+      "prompt": "Which reversal meets the in-place node-identity contract?",
+      "options": [
+        "Build fresh nodes in reverse order",
+        "Reverse the existing successor links",
+        "Swap payloads without changing links"
+      ],
+      "answer": 1,
+      "explanation": "The required output contains the original nodes in reverse identity order with unchanged payloads.",
+      "dimension": "Implement"
+    },
+    {
+      "id": "sentinel",
+      "type": "single",
+      "prompt": "What does a temporary predecessor sentinel accomplish?",
+      "options": [
+        "It makes every indexed lookup constant time",
+        "It supplies a predecessor for position zero",
+        "It is a required extra user element"
+      ],
+      "answer": 1,
+      "explanation": "Uniform predecessor logic handles head edits, but locating other positions still takes traversal.",
+      "dimension": "Explain"
+    },
+    {
+      "id": "proof",
+      "type": "multiple",
+      "prompt": "Which facts are part of the reversal loop-entry invariant?",
+      "options": [
+        "prev reaches the reverse of the consumed prefix",
+        "curr reaches the remaining suffix",
+        "Every node always remains reachable from the original head alone",
+        "The two chains are disjoint and contain all original nodes"
+      ],
+      "answer": [
+        0,
+        1,
+        3
+      ],
+      "explanation": "Local roots preserve the partition; the old head alone need not reach all nodes during reversal.",
+      "dimension": "Prove"
+    },
+    {
+      "id": "circular",
+      "type": "single",
+      "prompt": "How should an ordinary nonempty circular list traversal stop?",
+      "options": [
+        "When a payload repeats",
+        "When curr returns to the original head identity after processing",
+        "Only when curr becomes null"
+      ],
+      "answer": 1,
+      "explanation": "Circularity changes the stopping rule; duplicate payloads do not identify the head.",
+      "dimension": "Recognize"
+    },
+    {
+      "id": "doubly",
+      "type": "multiple",
+      "prompt": "After removing a middle node x in a doubly linked list, which assignments reconnect its neighbors?",
+      "options": [
+        "x.prev.next = x.next",
+        "x.next.prev = x.prev",
+        "x.value = x.next.value",
+        "head = null"
+      ],
+      "answer": [
+        0,
+        1
+      ],
+      "explanation": "Both directions must agree; changing a value does not unlink the node.",
+      "dimension": "Debug"
+    },
+    {
+      "id": "merge",
+      "type": "single",
+      "prompt": "Why does consuming merge require disjoint input chains?",
+      "options": [
+        "To ban equal values",
+        "To avoid reconnecting a node already present in both inputs",
+        "To make integers fit in memory"
+      ],
+      "answer": 1,
+      "explanation": "Shared tails break the consumption partition and can create self-links. Equal values are allowed.",
+      "dimension": "Apply"
+    }
+  ],
+  "problems": [
+    {
+      "id": "reverse-original-nodes",
+      "title": "Reverse the original nodes",
+      "difficulty": "Easy",
+      "topics": [
+        "linked-lists"
+      ],
+      "patterns": [
+        "pointer-reversal"
+      ],
+      "prerequisites": [
+        "arrays"
+      ],
+      "statement": "Implement reverse_list(head) in Python/C++ or reverseList(head) in JavaScript. The input is an acyclic singly linked chain. Return its new head by reversing next links in place. Preserve each original node identity and payload; create or delete no payload nodes. Helpers construct the inputs for tests. Do not reverse by copying values into another list.",
+      "constraints": [
+        "0 ≤ n ≤ 10,000",
+        "Integer payloads in [−1,000,000, 1,000,000]; duplicates allowed",
+        "Input is acyclic and exclusively owned; no concurrent mutation",
+        "Use O(1) auxiliary storage; recursion is not required"
+      ],
+      "examples": [
+        "n1(4) → n2(4) → n3(9) → null becomes n3(9) → n2(4) → n1(4) → null",
+        "null → null",
+        "n1(7) → null remains the same node"
+      ],
+      "hints": [
+        "What pointer will you lose if you overwrite the current successor?",
+        "Keep a reversed prefix and an untouched suffix. Save the successor before redirecting a link.",
+        "Use prev=null, curr=head. Save curr.next, point curr.next to prev, then advance both roots. Return prev."
+      ],
+      "starter": {
+        "python": "class Node:\n    def __init__(self, value, next=None):\n        self.value, self.next = value, next\n\ndef make_list(values):\n    head = None\n    for value in reversed(values):\n        head = Node(value, head)\n    return head\n\ndef to_values(head):\n    result = []\n    while head is not None:\n        result.append(head.value)\n        head = head.next\n    return result\n\ndef reverse_list(head):\n    # Rewire the original nodes.\n    return head\n",
+        "javascript": "class ListNode {\n  constructor(value, next = null) { this.value = value; this.next = next; }\n}\nfunction makeList(values) {\n  let head = null;\n  for (let i = values.length - 1; i >= 0; i--) head = new ListNode(values[i], head);\n  return head;\n}\nfunction toValues(head) {\n  const out = [];\n  for (; head !== null; head = head.next) out.push(head.value);\n  return out;\n}\nfunction reverseList(head) {\n  return head;\n}\n",
+        "cpp": "#include <vector>\n#include <stdexcept>\n#include <cassert>\nusing namespace std;\nstruct Node {\n    int value;\n    Node* next;\n    Node(int v, Node* n=nullptr): value(v), next(n) {}\n};\n// Ownership: caller owns one acyclic chain. No shared tails or concurrent access.\nvoid clear_list(Node*& head) {\n    while (head) { Node* next=head->next; delete head; head=next; }\n}\nNode* make_list(const vector<int>& values) {\n    Node* head=nullptr;\n    try { for (auto it=values.rbegin(); it!=values.rend(); ++it) head=new Node(*it, head); }\n    catch (...) { clear_list(head); throw; }\n    return head;\n}\nvector<int> to_values(Node* head) {\n    vector<int> values;\n    for (; head; head=head->next) values.push_back(head->value);\n    return values;\n}\nNode* reverse_list(Node* head) {\n    return head;\n}\n"
+      },
+      "tests": {
+        "python": "for title, values in [('empty', []), ('one', [7]), ('duplicates', [4,4,9]), ('longer', [0,-1,2,3])]:\n    head=make_list(values)\n    original=[]\n    curr=head\n    while curr is not None:\n        original.append(curr); curr=curr.next\n    result=reverse_list(head)\n    seen=[]; curr=result\n    # A bounded walk reports cycles without hanging.\n    while curr is not None and len(seen)<=len(original):\n        seen.append(curr); curr=curr.next\n    __check(title+' identity order', [id(n) for n in seen], [id(n) for n in reversed(original)])\n    __check(title+' payloads', [n.value for n in seen], list(reversed(values)))\n    __check(title+' termination', curr is None, True)\n",
+        "javascript": "for (const [title,values] of [['empty',[]],['one',[7]],['duplicates',[4,4,9]],['longer',[0,-1,2,3]]]) {\n  const head=makeList(values), original=[];\n  for(let p=head;p!==null;p=p.next) original.push(p);\n  const result=reverseList(head), seen=[];\n  let p=result;\n  while(p!==null && seen.length<=original.length) { seen.push(p); p=p.next; }\n  __check(title+' identity order',seen.length===original.length && seen.every((node,i)=>node===original[original.length-1-i]),true);\n  __check(title+' payloads',seen.map(node=>node.value),values.slice().reverse());\n  __check(title+' termination',p===null,true);\n}\n",
+        "cpp": "int main() {\n    vector<vector<int>> cases={{},{7},{4,4,9},{0,-1,2,3}};\n    for (size_t k=0;k<cases.size();++k) {\n        Node* head=make_list(cases[k]); vector<Node*> original;\n        for(Node* p=head;p;p=p->next) original.push_back(p);\n        Node* result=reverse_list(head); vector<Node*> seen;\n        Node* p=result;\n        while(p && seen.size()<=original.size()) { seen.push_back(p); p=p->next; }\n        bool identity=seen.size()==original.size(), payload=identity;\n        if(identity) for(size_t i=0;i<seen.size();++i) {\n            identity=identity && seen[i]==original[original.size()-1-i];\n            payload=payload && seen[i]->value==cases[k][cases[k].size()-1-i];\n        }\n        __check(\"identity \"+to_string(k),identity,true);\n        __check(\"payload \"+to_string(k),payload,true);\n        __check(\"termination \"+to_string(k),p==nullptr,true);\n        // The harness assumes allocated nodes remain live. Exercises must not delete them.\n        // Delete the original ownership set exactly once, even after a wrong rewire.\n        for(Node* node:original) delete node;\n    }\n    return 0;\n}\n"
+      },
+      "solution": {
+        "Naive approach": "Collect values and construct a new reversed chain. This produces the right values but violates node identity and allocates Θ(n) extra nodes.",
+        "Insight": "The unprocessed suffix must remain reachable after each successor link is overwritten. A saved successor and a reversed-prefix root suffice.",
+        "Algorithm": "Initialize prev=null and curr=head. While curr exists: save successor=curr.next; set curr.next=prev; set prev=curr and curr=successor. Return prev.",
+        "Correctness": "At every loop entry, prev reaches the reversed consumed prefix, curr reaches the original remaining suffix, and these disjoint chains partition all original nodes. One iteration transfers one node without changing its payload. Empty suffix gives the complete reverse.",
+        "Termination": "Remaining suffix length is a nonnegative integer that decreases by one per iteration.",
+        "Complexity": "Θ(n) node visits and n successor writes; Θ(1) auxiliary pointers. Existing input nodes are excluded from auxiliary storage.",
+        "Alternatives": "Recursion expresses suffix reversal but uses Θ(n) call frames without guaranteed elimination. A separate reversed copy is appropriate only for a different contract that permits new identities.",
+        "Common mistakes": "Overwrite curr.next before saving it; return the old head; swap payloads; accidentally form a cycle; recurse beyond the language stack limit."
+      }
+    }
+  ],
+  "resources": [
+    "opendsa-linked",
+    "opendsa-doubly"
+  ],
+  "trace": {
+    "kind": "linked-list",
+    "input": {
+      "values": [
+        10,
+        20,
+        30,
+        40
+      ],
+      "mode": "reverse"
+    }
+  }
+}

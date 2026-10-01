@@ -562,7 +562,7 @@
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
-        "linear-structures",
+        "linked-lists",
         "bit-manipulation"
       ],
       "related": [],
@@ -579,7 +579,7 @@
       "difficulty": "Advanced",
       "minutes": null,
       "prerequisites": [
-        "linear-structures",
+        "linked-lists",
         "randomized-algorithms"
       ],
       "related": [],
@@ -596,7 +596,7 @@
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
-        "linear-structures",
+        "linked-lists",
         "amortized-analysis"
       ],
       "related": [],
@@ -612,7 +612,7 @@
       "difficulty": "Intermediate",
       "minutes": null,
       "prerequisites": [
-        "linear-structures",
+        "linked-lists",
         "arrays"
       ],
       "related": [],
@@ -1129,7 +1129,7 @@
       ],
       "related": [],
       "status": "unresolved",
-      "description": "Source definition required before authoring; no automatic substitution with Fibonacci Heap."
+      "description": "Skipped at the learner’s request. The source definition remains unresolved; no substitution with Fibonacci Heap and no lesson is published."
     },
     {
       "id": "kmp",
@@ -1346,10 +1346,10 @@
     },
     {
       "id": "linked-lists",
-      "title": "Linked Lists",
+      "title": "Linked Lists: Identity, Links and Ownership",
       "category": "linear",
       "difficulty": "Beginner",
-      "minutes": null,
+      "minutes": 110,
       "prerequisites": [
         "arrays"
       ],
@@ -1359,7 +1359,8 @@
         "unrolled-linked-list",
         "skip-list"
       ],
-      "status": "planned"
+      "status": "published",
+      "description": "Build and reason about linked sequences, then trace pointer updates without losing nodes. Connect asymptotic costs to ownership, allocation and cache behavior."
     },
     {
       "id": "stacks",
@@ -1694,11 +1695,12 @@
     {
       "id": "foundations",
       "title": "DSA Foundations",
-      "description": "Start with contracts, cost models and memory representation, then study the original structure foundations and deep search lesson.",
+      "description": "Start with contracts, cost models, array memory and linked-node ownership, then study structure foundations and deep search.",
       "topics": [
         "algorithmic-thinking",
         "complexity",
         "arrays",
+        "linked-lists",
         "linear-structures",
         "sorting-searching",
         "binary-search",
@@ -1714,6 +1716,7 @@
         "arrays",
         "two-pointers",
         "linear-structures",
+        "linked-lists",
         "binary-search",
         "trees-graphs",
         "heaps",
@@ -1950,6 +1953,70 @@
         "Compare array-based representations by operation costs"
       ],
       "verified": true
+    },
+    {
+      "id": "opendsa-linked",
+      "title": "OpenDSA — Linked Lists",
+      "type": "Tutorial",
+      "url": "https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/ListLinked.html",
+      "author": "OpenDSA contributors",
+      "publisher": "OpenDSA",
+      "description": "After implementing the internal node operations, compare this course module’s representation and boundary conventions with the lesson. Trace which links change before adapting an operation to a different convention.",
+      "topics": [
+        "linked-lists"
+      ],
+      "prerequisites": [
+        "arrays"
+      ],
+      "difficulty": "Beginner",
+      "minutes": 35,
+      "language": "English",
+      "cost": "free",
+      "classification": "academic",
+      "quality": "curated",
+      "notes": "Publisher page opened and verified 2026-10-01. Editorial study estimate, not a media runtime. Focus on representation invariants; do not assume cursor semantics match indexed operations.",
+      "sections": [
+        "Node representation",
+        "Header/trailer conventions",
+        "Cursor-based insert/remove"
+      ],
+      "objectives": [
+        "Identify which sentinel convention an implementation uses",
+        "Explain how local pointer edits preserve the represented sequence"
+      ],
+      "verified": true
+    },
+    {
+      "id": "opendsa-doubly",
+      "title": "OpenDSA — Doubly Linked Lists",
+      "type": "Tutorial",
+      "url": "https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/ListDouble.html",
+      "author": "OpenDSA contributors",
+      "publisher": "OpenDSA",
+      "description": "After implementing the internal node operations, compare this course module’s representation and boundary conventions with the lesson. Trace which links change before adapting an operation to a different convention.",
+      "topics": [
+        "linked-lists"
+      ],
+      "prerequisites": [
+        "arrays"
+      ],
+      "difficulty": "Beginner",
+      "minutes": 35,
+      "language": "English",
+      "cost": "free",
+      "classification": "academic",
+      "quality": "curated",
+      "notes": "Publisher page opened and verified 2026-10-01. Editorial study estimate, not a media runtime. Focus on representation invariants; do not assume cursor semantics match indexed operations.",
+      "sections": [
+        "Bidirectional links",
+        "Boundary sentinels",
+        "Neighbor updates"
+      ],
+      "objectives": [
+        "Identify which sentinel convention an implementation uses",
+        "Explain how local pointer edits preserve the represented sequence"
+      ],
+      "verified": true
     }
   ],
   "patterns": [
@@ -2045,6 +2112,26 @@
       "topics": [
         "algorithmic-thinking",
         "arrays"
+      ]
+    },
+    {
+      "id": "pointer-reversal",
+      "title": "Reverse a Linked Chain",
+      "clues": [
+        "Existing node identities must be preserved",
+        "Order changes through successor links",
+        "Only constant auxiliary storage is allowed"
+      ],
+      "model": "A reversed prefix and unprocessed suffix partition the original nodes; preserve the next suffix root before rewiring.",
+      "template": "prev ← null; curr ← head\nwhile curr ≠ null:\n    successor ← curr.next\n    curr.next ← prev\n    prev ← curr\n    curr ← successor\nreturn prev",
+      "example": "Reverse a singly linked chain without copying payloads or allocating replacements.",
+      "mistakes": [
+        "Overwrite the successor before saving it",
+        "Return the old head",
+        "Change payloads rather than links"
+      ],
+      "topics": [
+        "linked-lists"
       ]
     }
   ],

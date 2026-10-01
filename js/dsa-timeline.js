@@ -137,6 +137,43 @@ const DSATimeline = (() => {
     };
   }
   function renderView(host, view) {
+    if (view.kind === 'linked-list') {
+      host.innerHTML = `<p>Each box is an allocated node. Arrows show next links; horizontal placement shows allocation order, not physical addresses. Null ends a chain. * marks the current operation.</p>
+        <dl>${Object.entries(view.pointers).map(([name, id]) => `<dt>${esc(name)}</dt><dd>${esc(id ?? 'null')}</dd>`).join('')}</dl>
+        <div class="dsa-scroll"><canvas role="img" aria-label="Linked nodes with directed successor arrows. The table below gives every value, link and local pointer."></canvas></div>
+        <div class="dsa-scroll"><table><caption>Node values and pointer connections, including detached nodes during updates</caption><thead><tr><th scope="col">Handle</th><th scope="col">Payload</th><th scope="col">Next →</th><th scope="col">Local pointers</th></tr></thead><tbody>${view.nodes.map(node => `<tr class="${view.active.includes(node.id) ? 'dsa-active' : ''}"><th scope="row">${esc(node.id)}${view.active.includes(node.id) ? ' *' : ''}</th><td>${node.id === 'sentinel' ? 'sentinel (not an element)' : esc(String(node.value))}</td><td>${esc(node.next ?? 'null')}</td><td>${esc(Object.entries(view.pointers).filter(([, id]) => id === node.id).map(([name]) => name).join(', ') || '—')}</td></tr>`).join('')}</tbody></table></div>${view.nodes.length ? '' : '<p>Empty list: head is null.</p>'}`;
+      const canvas = host.querySelector('canvas');
+      canvas.style.display = 'block'; canvas.style.width = '100%';
+      canvas.style.minWidth = `${Math.max(280, view.nodes.length * 115 + 30)}px`;
+      const { ctx, W, H } = LabViz.primitives.setup(canvas, 220), th = LabViz.primitives.theme();
+      LabViz.primitives.clear(ctx, W, H, th);
+      const positions = new Map(view.nodes.map((node, i) => [node.id, 60 + i * 115]));
+      ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+      for (const node of view.nodes) {
+        if (node.next === null) continue;
+        const from = positions.get(node.id), to = positions.get(node.next), direction = Math.sign(to - from);
+        const start = from + direction * 34, end = to - direction * 34;
+        const rise = Math.min(100, 35 + Math.abs(to - from) / 8);
+        ctx.strokeStyle = th.text; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(start, 120); ctx.quadraticCurveTo((start + end) / 2, 120 - rise, end, 120); ctx.stroke();
+        const angle = Math.atan2(rise, (end - start) / 2);
+        ctx.beginPath(); ctx.moveTo(end, 120);
+        ctx.lineTo(end - 9 * Math.cos(angle - 0.45), 120 - 9 * Math.sin(angle - 0.45));
+        ctx.lineTo(end - 9 * Math.cos(angle + 0.45), 120 - 9 * Math.sin(angle + 0.45));
+        ctx.closePath(); ctx.fillStyle = th.text; ctx.fill();
+      }
+      for (const node of view.nodes) {
+        const x = positions.get(node.id), active = view.active.includes(node.id);
+        ctx.fillStyle = th.bg; ctx.fillRect(x - 32, 100, 64, 42);
+        ctx.strokeStyle = active ? th.accent : th.text; ctx.lineWidth = active ? 3 : 1.5;
+        ctx.strokeRect(x - 32, 100, 64, 42); ctx.fillStyle = th.text;
+        ctx.fillText(`${node.id}${active ? ' *' : ''}`, x, 93);
+        ctx.fillText(node.id === 'sentinel' ? 'dummy' : String(node.value), x, 126);
+        ctx.fillText(`next: ${node.next ?? 'null'}`, x, 162);
+      }
+      if (!view.nodes.length) { ctx.fillStyle = th.text; ctx.fillText('Empty list', W / 2, H / 2); }
+      return;
+    }
     if (view.kind === 'array') {
       host.innerHTML = `<p>${esc(view.intervalLabel || 'Active interval')} [${view.low}, ${view.high})${view.target === undefined ? '' : '; target ' + esc(String(view.target))}</p><div class="dsa-cells" role="list" aria-label="Array values">` + view.values.map((value, index) => `<div role="listitem" class="dsa-cell ${view.active.includes(index) ? 'active' : ''} ${index < view.low || index >= view.high ? 'dsa-outside' : ''}"><small>index ${index}</small>${esc(value === null ? 'unused' : String(value))}${view.active.includes(index) ? '<small>' + esc(view.mid === undefined ? 'current' : 'midpoint') + '</small>' : ''}${index < view.low || index >= view.high ? '<small>' + esc(view.outsideLabel || 'excluded') + '</small>' : ''}</div>`).join('') + '</div>' + (view.values.length ? '' : '<p>Empty array.</p>') + (view.result == null ? '' : `<p>Result: ${esc(JSON.stringify(view.result))}${view.target !== undefined && view.result === -1 ? ' (not found)' : ''}</p>`);
       return;

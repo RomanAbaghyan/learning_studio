@@ -15,3 +15,10 @@ Resources are external metadata, not copied book/course contents. The four initi
 Trace inputs use the shared DSA adapter: `binary-search` has `values`, `target`, `mode`; `avl-tree` has `values` and `delete`; `dijkstra` has `nodes`, `edges` with `from`/`to`/`weight`, and `source`; `knapsack` has `items` with `weight`/`value` and `capacity`. Trace pseudocode is supplied by the trace engine so highlighted lines match actual events.
 
 Before publishing, review motivation, invariants, operations, correctness, complexity derivation, memory behavior, mistakes, edge cases, variants, alternatives and meaningful practice. Validate the catalog through the content API and execute reference code. Advanced catalog entries are intentionally planned until they meet that standard.
+
+Linked Lists demonstrates preservation of object identity in public practice
+checks. Its bounded walks catch cycles rather than hanging. C++ exercises assume
+the original nodes remain allocated; freeing them violates the exercise contract.
+Trace modes include reverse, find, insert, erase and stable sorted merge through
+the same immutable protocol. The advanced list topics now require this unit;
+the combined legacy `linear-structures` lesson and its completion remain separate.

@@ -55,3 +55,38 @@ for most core and advanced topics, the full pattern library, additional quiz
 interaction types, unified full-text search, an in-app content editor, and
 arbitrary-code stepping. The new catalog entries are a roadmap, not a claim that
 all advanced structures have been implemented. Fibonacci Tree remains unresolved.
+
+## Linked-list continuation — 2026-10-01
+
+The next audited unit is documented in `DSA_LINKED_LISTS_AUDIT.md`. Eight lessons
+are now published. Linked Lists covers the sequence ADT, node identity and
+ownership, singly/doubly/circular/sentinel invariants, traversal and first-match
+find, predecessor-based insertion/deletion, in-place reversal and stable
+consuming merge. Five language implementations accompany 18 substantive
+sections, nine assessments and a runnable identity-preserving reversal exercise.
+
+The shared trace engine adds bounded reverse/insert/erase/find/merge modes with
+immutable pointer, node-allocation and counter snapshots. Directed successor
+arrows use existing LabViz primitives; semantic tables expose every link and
+local root without depending on color. Pattern/size controls generate linked
+input in the algorithm lab. The mobile grid now lets wide diagrams scroll inside
+their panels. Advanced list prerequisite edges and the foundations/interview
+paths use the same canonical `linked-lists` ID. Legacy combined completion is
+preserved separately; there is no schema migration or automatic mastery credit.
+
+Two verified OpenDSA modules provide external study guidance and library entries.
+The ambiguity question was answered with an explicit request to skip Fibonacci
+Tree: it remains unpublished, with that decision recorded in its description.
+
+Verification: 154 pytest tests passed, including C++/Java/TypeScript compilation,
+Python identity/sequence oracles, public practice harnesses, API discovery,
+account-state integration and JavaScript trace regressions. The full Chromium
+smoke test passed across all eight lessons and workspace routes, with new checks
+for each linked trace mode, generated input and mobile overflow. A mobile capture
+was visually inspected. Content validation, JavaScript syntax and whitespace
+checks passed. Test servers use `/tmp` databases; real account data was untouched.
+
+Still outstanding: complete core and advanced content for the 98 planned topics,
+the remaining pattern library, additional assessment interaction types, unified
+full-text search, in-app authoring, and arbitrary-code debugging. A published
+foundation is not a claim that the full advanced curriculum is complete.

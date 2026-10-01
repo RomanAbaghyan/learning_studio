@@ -95,6 +95,115 @@
     frame(6, 'All appends complete. Copy counts show amortized work; a single growing append can still be linear.');
     return t.finish(buffer.slice(0, size));
   }
+  function linkedList(input) {
+    const { values, mode = 'reverse', index, value, target, other } = input;
+    numbers(values, 32);
+    requireInput(['reverse', 'insert', 'erase', 'find', 'merge'].includes(mode), 'Use reverse, insert, erase, find or merge mode.');
+    if (mode === 'merge') {
+      numbers(other, 32);
+      requireInput([values, other].every(chain => chain.every((v, i) => !i || chain[i - 1] <= v)), 'Merge requires two nondecreasing input chains.');
+    }
+    if (mode === 'insert' || mode === 'erase') requireInput(Number.isInteger(index) && index >= 0 && index < values.length + (mode === 'insert' ? 1 : 0), 'Index must name an existing element, or an insertion boundary.');
+    if (mode === 'insert') requireInput(number(value), 'Inserted value must be a finite number.');
+    if (mode === 'find') requireInput(number(target), 'Target must be a finite number.');
+    const code = {
+      reverse: ['prev = null; curr = head', 'while curr != null:', '    next = curr.next  // preserve the unprocessed suffix', '    curr.next = prev', '    prev = curr; curr = next', 'head = prev; return list'],
+      insert: ['sentinel.next = head; pred = sentinel', 'advance pred by index links', 'node = allocate(value, pred.next)', 'pred.next = node', 'head = sentinel.next; release sentinel; return list'],
+      erase: ['sentinel.next = head; pred = sentinel', 'advance pred by index links', 'victim = pred.next', 'pred.next = victim.next', 'release victim; head = sentinel.next; release sentinel; return list'],
+      find: ['curr = head; position = 0', 'while curr != null:', '    if curr.value == target: return position', '    curr = curr.next; position += 1', 'return -1'],
+      merge: ['sentinel.next = null; tail = sentinel; a = left; b = right', 'while a != null and b != null:', '    attach smaller front to tail.next; take a first on equality', '    advance the selected input pointer; tail = tail.next', 'tail.next = the nonempty remaining suffix', 'head = sentinel.next; release sentinel; return merged list']
+    };
+    const t = recorder(code[mode]), nodes = values.map((v, i) => ({ id: `n${i + 1}`, value: v, next: i + 1 < values.length ? `n${i + 2}` : null }));
+    let head = nodes[0]?.id ?? null, visits = 0, comparisons = 0, linkWrites = 0, allocations = 0, releases = 0;
+    let pointers = { head }, position = 0;
+    const get = id => nodes.find(n => n.id === id);
+    const frame = (line, text, active = [], prediction) => t.add(line, text,
+      { mode, ...pointers, ...(mode === 'find' ? { target, position } : {}), ...(mode === 'insert' || mode === 'erase' ? { index } : {}) },
+      { kind: 'linked-list', nodes, pointers, active },
+      { visits, comparisons, linkWrites, allocations, releases, liveNodes: nodes.length }, [],
+      [{ label: 'Conceptual node handles; allocation order is not physical adjacency. Input nodes already exist, so allocation counters count only this operation.', nodes }], prediction);
+    if (mode === 'merge') {
+      nodes.push(...other.map((v, i) => ({ id: `b${i + 1}`, value: v, next: i + 1 < other.length ? `b${i + 2}` : null })));
+      nodes.push({ id: 'sentinel', value: null, next: null }); allocations++;
+      let a = head, b = other.length ? 'b1' : null, tail = 'sentinel';
+      pointers = { sentinel: 'sentinel', tail, a, b };
+      frame(0, 'Two separate sorted chains are ready to merge. A temporary sentinel anchors the output.');
+      while (a !== null && b !== null) {
+        frame(1, 'The output prefix is sorted. Compare the two remaining fronts.', [a, b],
+          { prompt: 'Which input front is attached next?', options: ['Left chain (a)', 'Right chain (b)'], answer: get(a).value <= get(b).value ? 0 : 1, explanation: 'Take the smaller front; equality takes a first for stable left-before-right order.' });
+        const left = get(a).value <= get(b).value; comparisons++; visits++;
+        const chosen = left ? a : b;
+        get(tail).next = chosen; linkWrites++;
+        frame(2, 'Attach the chosen node without copying its value. Its old suffix remains reachable until tail.next is replaced.', [tail, chosen]);
+        if (left) a = get(a).next; else b = get(b).next;
+        tail = chosen; pointers = { sentinel: 'sentinel', tail, a, b };
+        frame(3, 'Advance exactly one input. The output prefix ends at tail; its next link may still name an input suffix.', [tail]);
+      }
+      get(tail).next = a !== null ? a : b; linkWrites++;
+      frame(4, 'Attach the remaining sorted suffix with one link write; no per-node copies are needed.', [tail]);
+      head = get('sentinel').next;
+      nodes.splice(nodes.findIndex(n => n.id === 'sentinel'), 1); releases++;
+      pointers = { head }; frame(5, 'Transfer both input chains to the merged result. The sentinel is not a payload node.');
+    } else if (mode === 'reverse') {
+      let prev = null, curr = head, next = null;
+      pointers = { head, prev, curr, next };
+      frame(0, 'The reversed prefix is empty. The current pointer reaches the entire unprocessed suffix.');
+      while (curr !== null) {
+        pointers = { head, prev, curr, next }; visits++;
+        frame(1, 'The two chains contain all original nodes; the next link must be saved before it is overwritten.', [curr],
+          { prompt: 'Which step preserves access to the remaining suffix?', options: ['Save curr.next in next', 'Set curr.next to prev first'], answer: 0, explanation: 'Saving the successor before relinking prevents losing the suffix.' });
+        next = get(curr).next; pointers.next = next;
+        frame(2, 'Save the original successor in a local pointer.', [curr]);
+        get(curr).next = prev; linkWrites++;
+        frame(3, 'Reverse one node link. The saved next pointer still reaches the remaining suffix.', [curr]);
+        prev = curr; curr = next; pointers = { head, prev, curr, next };
+        frame(4, 'Move one node from the unprocessed suffix into the reversed prefix.', prev ? [prev] : []);
+      }
+      head = prev; pointers = { head, prev, curr, next };
+      frame(5, 'Publish the new head. Node identities and payloads are unchanged; no allocation was needed.');
+    } else if (mode === 'find') {
+      let curr = head; pointers = { head, curr };
+      frame(0, 'Begin at the head. No earlier positions have been examined.');
+      while (curr !== null) {
+        visits++; frame(1, 'All earlier nodes differed from the target.', [curr]);
+        comparisons++; frame(2, get(curr).value === target ? 'This is the first matching node.' : 'The current value differs; follow its next link.', [curr]);
+        if (get(curr).value === target) return t.finish(position);
+        curr = get(curr).next; position++; pointers = { head, curr };
+        frame(3, 'Advance one link; no constant-time indexed jump is available.');
+      }
+      frame(4, 'Null ends the chain. No node matched the target.'); return t.finish(-1);
+    } else {
+      nodes.push({ id: 'sentinel', value: null, next: head }); allocations++;
+      let pred = 'sentinel'; pointers = { head, pred, sentinel: 'sentinel' };
+      frame(0, 'A temporary sentinel supplies a predecessor even for index zero. It is not a list element.');
+      for (let i = 0; i < index; i++) {
+        pred = get(pred).next; visits++; pointers.pred = pred;
+        frame(1, 'Locate the predecessor. These traversals are part of the indexed operation cost.', [pred]);
+      }
+      if (mode === 'insert') {
+        const id = `n${values.length + 1}`;
+        nodes.push({ id, value, next: get(pred).next }); allocations++; linkWrites++;
+        pointers.node = id;
+        frame(2, 'Initialize the new node with the old successor before publishing the predecessor link.', [id],
+          { prompt: 'Which pointer publishes the new node into the list?', options: ['pred.next', 'node.next'], answer: 0, explanation: 'node.next already preserves the suffix. Redirect pred.next to attach the new node.' });
+        get(pred).next = id; linkWrites++;
+        frame(3, 'Publish the new predecessor link. Existing payloads have not shifted.', [pred, id]);
+      } else {
+        const victim = get(pred).next; pointers.victim = victim;
+        frame(2, 'Save the victim so its successor can be read before release.', [victim]);
+        get(pred).next = get(victim).next; linkWrites++;
+        frame(3, 'Bypass the victim. It is detached but still allocated in this snapshot.', [pred, victim]);
+        nodes.splice(nodes.findIndex(n => n.id === victim), 1); releases++; delete pointers.victim;
+      }
+      head = get('sentinel').next;
+      nodes.splice(nodes.findIndex(n => n.id === 'sentinel'), 1); releases++;
+      pointers = { head };
+      frame(4, 'Publish the head and retire temporary storage. No pointer in the final state names a released node.');
+    }
+    const result = [];
+    for (let curr = head; curr !== null; curr = get(curr).next) result.push(get(curr).value);
+    return t.finish(result);
+  }
   function binary(input) {
     const { values, target, mode = 'exact' } = input;
     numbers(values, 128); requireInput(number(target), 'Target must be a finite number.');
@@ -238,12 +347,13 @@
     'linear-search': { values: [8, 3, 5, 3, 9], target: 3 },
     'operation-count': { n: 6, mode: 'triangular' },
     'dynamic-array': { values: [10, 20, 30, 40, 50], capacity: 0 },
+    'linked-list': { values: [10, 20, 30, 40], mode: 'reverse' },
     'binary-search': { values: [1, 3, 3, 5, 8, 13, 21], target: 3, mode: 'lower_bound' },
     'avl-tree': { values: [30, 10, 20, 40, 50, 25], delete: [10] },
     dijkstra: { nodes: ['A', 'B', 'C', 'D', 'E'], source: 'A', edges: [{ from: 'A', to: 'B', weight: 4 }, { from: 'A', to: 'C', weight: 1 }, { from: 'C', to: 'B', weight: 2 }, { from: 'B', to: 'D', weight: 1 }, { from: 'C', to: 'D', weight: 5 }] },
     knapsack: { items: [{ weight: 2, value: 3 }, { weight: 3, value: 4 }, { weight: 4, value: 5 }, { weight: 5, value: 8 }], capacity: 7 }
   });
-  const generators = { 'linear-search': linear, 'operation-count': counting, 'dynamic-array': dynamicArray, 'binary-search': binary, 'avl-tree': avl, dijkstra, knapsack };
+  const generators = { 'linear-search': linear, 'operation-count': counting, 'dynamic-array': dynamicArray, 'linked-list': linkedList, 'binary-search': binary, 'avl-tree': avl, dijkstra, knapsack };
   global.DSATraces = Object.freeze({ defaults, generate(kind, input) {
     requireInput(Object.prototype.hasOwnProperty.call(generators, kind), 'Unknown teaching trace.');
     requireInput(input === undefined || (input !== null && typeof input === 'object' && !Array.isArray(input)), 'Trace input must be an object.');

@@ -11,7 +11,7 @@ import subprocess
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1] / 'content' / 'dsa'
-REFERENCE_LESSONS = ['binary-search', 'avl-tree', 'dijkstra', 'knapsack', 'algorithmic-thinking', 'complexity', 'arrays']
+REFERENCE_LESSONS = ['binary-search', 'avl-tree', 'dijkstra', 'knapsack', 'algorithmic-thinking', 'complexity', 'arrays', 'linked-lists']
 
 
 def lesson(name):
@@ -176,7 +176,7 @@ def test_cpp_exercise_harness_uses_existing_runner_protocol(name):
         'dijkstra': 'bool relax(vector<long long>&d,int u,int v,long long w){if(d[u]+w<d[v]){d[v]=d[u]+w;return true;}return false;}',
         'knapsack': 'int knapsack_value(const vector<pair<int,int>>&items,int capacity){vector<int>d(capacity+1);for(auto [w,v]:items)for(int c=capacity;c>=w;c--)d[c]=max(d[c],d[c-w]+v);return d[capacity];}',
     }
-    for new in ['algorithmic-thinking', 'complexity', 'arrays']:
+    for new in ['algorithmic-thinking', 'complexity', 'arrays', 'linked-lists']:
         sources[new] = lesson(new)['implementations']['cpp'].split('int main()')[0]
     for source, expected_pass in [(sources[name], True), (problem['starter']['cpp'], False)]:
         result = app._compile_and_run_cpp(source, problem['tests']['cpp'])
@@ -260,3 +260,63 @@ def test_dynamic_array_model_preserves_sequence_and_clears_removed_references():
             values = list(range(n))
             assert ns['erase_at'](values, index) == index
             assert values == [j for j in range(n) if j != index]
+
+
+def test_linked_operations_match_sequences_and_preserve_owned_node_identities():
+    ns = implementation('linked-lists')
+    head, expected = None, []
+    rng = random.Random(331)
+
+    def nodes(head):
+        result, seen = [], set()
+        while head is not None:
+            assert id(head) not in seen, 'ordinary chain must be acyclic'
+            seen.add(id(head))
+            result.append(head)
+            head = head.next
+        return result
+
+    for _ in range(350):
+        before = nodes(head)
+        action = rng.choice(['insert', 'erase', 'reverse', 'find']) if expected else 'insert'
+        if action == 'insert':
+            i, value = rng.randrange(len(expected) + 1), rng.randrange(-4, 5)
+            head = ns['insert_at'](head, i, value)
+            expected.insert(i, value)
+            after = nodes(head)
+            assert after[:i] + after[i + 1:] == before
+            assert after[i] not in before
+        elif action == 'erase':
+            i = rng.randrange(len(expected))
+            victim = before[i]
+            head = ns['erase_at'](head, i)
+            expected.pop(i)
+            assert nodes(head) == before[:i] + before[i + 1:]
+            assert victim.next is None
+        elif action == 'reverse':
+            head = ns['reverse_list'](head)
+            expected.reverse()
+            assert nodes(head) == before[::-1]
+        else:
+            target = rng.randrange(-5, 6)
+            assert ns['find_index'](head, target) == (expected.index(target) if target in expected else -1)
+        assert ns['to_values'](head) == expected
+        original = nodes(head)
+        links = [node.next for node in original]
+        for bad in [-1, len(expected) + 1]:
+            with pytest.raises(IndexError):
+                ns['insert_at'](head, bad, 99)
+            with pytest.raises(IndexError):
+                ns['erase_at'](head, bad)
+        with pytest.raises(IndexError):
+            ns['erase_at'](head, len(expected))
+        assert nodes(head) == original
+        assert [node.next for node in original] == links
+
+    for _ in range(80):
+        a = ns['make_list'](sorted(rng.randrange(5) for _ in range(rng.randrange(20))))
+        b = ns['make_list'](sorted(rng.randrange(5) for _ in range(rng.randrange(20))))
+        left, right = nodes(a), nodes(b)
+        # Independent stable sort of the original identity sequence is the oracle.
+        oracle = sorted(left + right, key=lambda node: node.value)
+        assert nodes(ns['merge_sorted'](a, b)) == oracle

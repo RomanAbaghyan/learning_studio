@@ -11,7 +11,7 @@ const extras={ 'avl-tree': 'function isBalanced(n){function h(n){if(!n)return 0;
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base+'/tracks/dsa.html');
  await page.getByRole('heading',{name:'Your learning workspace'}).waitFor();
- for(const id of ['binary-search','avl-tree','dijkstra','knapsack','algorithmic-thinking','complexity','arrays']){
+ for(const id of ['binary-search','avl-tree','dijkstra','knapsack','algorithmic-thinking','complexity','arrays','linked-lists']){
   await page.goto(base+'/tracks/dsa.html#topic/'+id);
   await page.locator('[data-position]').waitFor();
   console.log(id,await page.locator('[data-position]').textContent());
@@ -54,6 +54,25 @@ const extras={ 'avl-tree': 'function isBalanced(n){function h(n){if(!n)return 0;
   assert.equal(await page.getByText('Unable to load this view',{exact:true}).count(),0,name);
   console.log('route',name);
  }
+ await page.goto(base+'/tracks/dsa.html#topic/linked-lists');
+ await page.locator('[data-position]').waitFor();
+ await page.getByText('Configure input',{exact:true}).click();
+ for(const [input, result] of [
+  [{values:[10,20,30],mode:'reverse'},[30,20,10]],
+  [{values:[10,30],mode:'insert',index:1,value:20},[10,20,30]],
+  [{values:[10,20,30],mode:'erase',index:1},[10,30]],
+  [{values:[7,2,7],mode:'find',target:7},0],
+  [{values:[1,3],other:[2,3],mode:'merge'},[1,2,3,3]],
+  [{values:[],mode:'reverse'},[]]
+ ]) {
+  await page.locator('[data-input]').fill(JSON.stringify(input));
+  await page.locator('[data-build]').click();
+  assert.equal(await page.locator('[data-input-error]').textContent(),'');
+  await page.locator('[data-seek]').evaluate(el=>{el.value=el.max;el.dispatchEvent(new Event('input',{bubbles:true}));});
+  assert.ok((await page.locator('[data-position]').textContent()).includes('Result: '+JSON.stringify(result)));
+  await page.getByRole('table',{name:'Node values and pointer connections, including detached nodes during updates'}).waitFor();
+  await page.getByRole('img',{name:/Linked nodes/}).waitFor();
+ }
  await page.goto(base+'/tracks/dsa.html#curriculum');
  await page.locator('[data-search]').fill('Binary Indexed Tree');
  await page.getByRole('link',{name:'Fenwick Tree',exact:true}).waitFor({state:'visible'});
@@ -64,12 +83,21 @@ const extras={ 'avl-tree': 'function isBalanced(n){function h(n){if(!n)return 0;
  assert.ok((await page.locator('[data-comparison-body]').textContent()).includes('finding it can be Θ(n)'));
  await page.locator('[data-comparison]').selectOption('fenwick-segment');
  assert.ok(page.url().endsWith('#compare/fenwick-segment'));
- for(const id of ['algorithmic-thinking','complexity','arrays']) {
+ for(const id of ['algorithmic-thinking','complexity','arrays','linked-lists']) {
   await page.goto(base+'/tracks/dsa.html#lab');
   await page.locator('[data-alg]').selectOption(id);
   await page.locator('[data-position]').waitFor();
   assert.equal(await page.locator('[data-input-error]').textContent(),'');
   await page.getByRole('button',{name:'Next',exact:true}).click();
+  if(id==='linked-lists') {
+   assert.equal(await page.locator('[data-size]').isEnabled(),true);
+   await page.locator('[data-size]').fill('5');
+   await page.locator('[data-pattern]').selectOption('duplicates');
+   await page.getByRole('button',{name:'Generate input',exact:true}).click();
+   await page.locator('[data-position]').waitFor();
+   const generated=JSON.parse(await page.locator('[data-input]').inputValue());
+   assert.deepEqual(generated.values,[0,1,2,0,1]);
+  }
  }
  await page.goto(base+'/tracks/dsa.html#resources');
  await page.getByRole('button',{name:'Save to library',exact:true}).first().click();
@@ -82,11 +110,15 @@ const extras={ 'avl-tree': 'function isBalanced(n){function h(n){if(!n)return 0;
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+2);
  await page.screenshot({path:process.env.DSA_SCREENSHOT || '/tmp/dsa-mobile.png',fullPage:true});
  assert.equal(overflow,false,'mobile horizontal overflow');
- for(const hash of ['topic/arrays','compare/array-list','curriculum']) {
+ for(const hash of ['topic/arrays','topic/linked-lists','compare/array-list','curriculum']) {
   await page.goto(base+'/tracks/dsa.html#'+hash);
   await page.locator('#dsa-root h2').first().waitFor();
-  if(hash==='topic/arrays')await page.locator('[data-position]').waitFor();
+  if(hash.startsWith('topic/'))await page.locator('[data-position]').waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+2),false,'mobile overflow: '+hash);
+  if(hash==='topic/linked-lists') {
+   await page.locator('[data-timeline]').scrollIntoViewIfNeeded();
+   await page.locator('[data-timeline]').screenshot({path:'/tmp/dsa-linked-mobile.png'});
+  }
  }
  assert.deepEqual(errors,[]);
  console.log('PASS browser routes, traces, predictions, drafts, tutor, library, notes, mobile; no JS errors');

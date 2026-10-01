@@ -39,6 +39,73 @@ test('binary search modes match linear references with duplicates and empty inpu
     }
   }
 });
+test('linked-list traces match sequence edits and retain valid pointers in every snapshot', () => {
+  for (let n = 0; n <= 12; n++) {
+    const values = Array.from({ length: n }, () => random(9) - 4);
+    const traces = [generate('linked-list', { values, mode: 'reverse' })];
+    assert.deepEqual(traces[0].result, values.slice().reverse());
+    assert.equal(traces[0].frames.at(-1).counters.linkWrites, n);
+    assert.equal(traces[0].frames.at(-1).counters.allocations, 0);
+    const originalIds = traces[0].frames[0].view.nodes.map(node => node.id);
+    const reversedIds = [];
+    const final = traces[0].frames.at(-1).view;
+    for (let id = final.pointers.head; id !== null; id = final.nodes.find(node => node.id === id).next) reversedIds.push(id);
+    assert.deepEqual(reversedIds, originalIds.slice().reverse());
+    for (let i = 0; i <= n; i++) {
+      const expected = values.slice(); expected.splice(i, 0, 101);
+      const trace = generate('linked-list', { values, mode: 'insert', index: i, value: 101 });
+      assert.deepEqual(trace.result, expected);
+      assert.equal(trace.frames.at(-1).counters.visits, i);
+      traces.push(trace);
+      if (i < n) {
+        const erased = values.slice(); erased.splice(i, 1);
+        const removal = generate('linked-list', { values, mode: 'erase', index: i });
+        assert.deepEqual(removal.result, erased);
+        assert.equal(removal.frames.at(-1).counters.visits, i);
+        assert.equal(removal.frames.at(-1).view.nodes.length, n - 1);
+        traces.push(removal);
+      }
+    }
+    for (const target of [-5, 0, 4, 5]) {
+      const trace = generate('linked-list', { values, mode: 'find', target });
+      const index = values.indexOf(target);
+      assert.equal(trace.result, index);
+      assert.equal(trace.frames.at(-1).counters.comparisons, index === -1 ? n : index + 1);
+      traces.push(trace);
+    }
+    for (const trace of traces) for (const frame of trace.frames) {
+      const ids = new Set(frame.view.nodes.map(node => node.id));
+      for (const node of frame.view.nodes) assert.ok(node.next === null || ids.has(node.next));
+      for (const id of Object.values(frame.view.pointers)) assert.ok(id === null || ids.has(id));
+      for (const id of frame.view.active) assert.ok(ids.has(id));
+      assert.ok(Object.isFrozen(frame.view.nodes));
+    }
+  }
+});
+test('linked-list reversal loop-entry partitions cover original nodes without cycles', () => {
+  const trace = generate('linked-list', { values: [3, 3, 7, 1], mode: 'reverse' });
+  for (const frame of trace.frames.filter(frame => frame.line === 1 || frame.line === 4)) {
+    const walk = start => {
+      const seen = [];
+      for (let id = start; id !== null; id = frame.view.nodes.find(node => node.id === id).next) {
+        assert.ok(!seen.includes(id)); seen.push(id);
+      }
+      return seen;
+    };
+    const prefix = walk(frame.view.pointers.prev), suffix = walk(frame.view.pointers.curr);
+    assert.equal(new Set([...prefix, ...suffix]).size, 4);
+    assert.equal(prefix.length + suffix.length, 4);
+    assert.deepEqual(prefix.slice().reverse().concat(suffix), ['n1', 'n2', 'n3', 'n4']);
+  }
+});
+test('linked-list trace rejects invalid boundaries and malformed input', () => {
+  for (const input of [
+    { values: [1], mode: 'erase', index: 1 }, { values: [], mode: 'erase', index: 0 },
+    { values: [1], mode: 'insert', index: -1, value: 2 }, { values: [1], mode: 'insert', index: 2, value: 2 },
+    { values: [1], mode: 'insert', index: 0.5, value: 2 }, { values: [1], mode: 'insert', index: 0, value: NaN },
+    { values: [1], mode: 'find' }, { values: [1], mode: 'unknown' }, { values: Array(33).fill(1) }
+  ]) assert.throws(() => generate('linked-list', input));
+});
 test('AVL covers all four rotations and real deletion rebalance', () => {
   for (const values of [[30, 20, 10], [10, 20, 30], [30, 10, 20], [10, 30, 20]]) {
     const trace = generate('avl-tree', { values });
@@ -115,13 +182,37 @@ test('linear trace proves first occurrence and counts only comparisons actually 
 test('operation counters match closed-form oracles including empty input', () => {
   for(let n=0;n<=48;n++)for(const mode of ['linear','triangular','doubling']) {
     const trace=generate('operation-count',{n,mode});
-    const expected=mode==='linear'?n:mode==='triangular'?n*(n-1)/2:n<=1?0:Math.ceil(Math.log2(n));
+    const expected=mode==='linear'?n:mode==='triangular'?(n<=1?0:n*(n-1)/2):n<=1?0:Math.ceil(Math.log2(n));
     assert.equal(trace.result,expected);
     assert.equal(trace.frames.at(-1).counters.bodyExecutions,expected);
   }
   assert.throws(()=>generate('operation-count',{n:49}));
   assert.throws(()=>generate('operation-count',{n:1.5}));
   assert.throws(()=>generate('operation-count',{n:2,mode:'unknown'}));
+});
+test('linked-list merge preserves stable identity order and consumes two sorted chains', () => {
+  for (let trial = 0; trial < 70; trial++) {
+    const values = Array.from({ length: random(16) }, () => random(7)).sort((a, b) => a - b);
+    const other = Array.from({ length: random(16) }, () => random(7)).sort((a, b) => a - b);
+    const trace = generate('linked-list', { values, other, mode: 'merge' });
+    const expected = [...values.map((value, i) => ({ id: `n${i + 1}`, value })), ...other.map((value, i) => ({ id: `b${i + 1}`, value }))].sort((a, b) => a.value - b.value);
+    assert.deepEqual(trace.result, expected.map(node => node.value));
+    const final = trace.frames.at(-1).view, ids = [];
+    for (let id = final.pointers.head; id !== null; id = final.nodes.find(node => node.id === id).next) {
+      assert.ok(!ids.includes(id)); ids.push(id);
+    }
+    assert.deepEqual(ids, expected.map(node => node.id));
+    assert.equal(final.nodes.length, values.length + other.length);
+    assert.ok(trace.frames.at(-1).counters.comparisons <= Math.max(0, values.length + other.length - 1));
+    for (const frame of trace.frames) {
+      const live = new Set(frame.view.nodes.map(node => node.id));
+      for (const node of frame.view.nodes) assert.ok(node.next === null || live.has(node.next));
+      for (const id of Object.values(frame.view.pointers)) assert.ok(id === null || live.has(id));
+    }
+  }
+  assert.throws(() => generate('linked-list', { values: [2, 1], other: [], mode: 'merge' }));
+  assert.throws(() => generate('linked-list', { values: [], other: [3, 2], mode: 'merge' }));
+  assert.throws(() => generate('linked-list', { values: [], mode: 'merge' }));
 });
 
 test('array growth preserves live prefixes, models temporary allocation, and has linear aggregate copying', () => {

@@ -215,7 +215,7 @@ def test_real_catalog_hierarchy_canonical_aliases_and_foundation_lessons():
     assert 'Binary Indexed Tree' in topics['fenwick-tree']['aliases']
     assert 'graph-structures' in topics['gomory-hu-tree']['categories']
     assert any(item.get('parent') == 'structures' for item in catalog['categories'])
-    for id in ['algorithmic-thinking', 'complexity', 'arrays']:
+    for id in ['algorithmic-thinking', 'complexity', 'arrays', 'linked-lists']:
         assert topics[id]['status'] == 'published'
         data = api.get('/api/dsa/lessons/' + id).json()
         assert len(data['sections']) >= 10
@@ -223,3 +223,8 @@ def test_real_catalog_hierarchy_canonical_aliases_and_foundation_lessons():
         assert api.get('/api/dsa/problems', params={'topic': id}).json()['total'] >= 1
     assert topics['arrays']['legacyId'] == 'dsa-1-2'
     assert topics['complexity']['legacyId'] == 'dsa-1-1'
+    assert 'legacyId' not in topics['linked-lists']
+    for id in ['xor-linked-list', 'skip-list', 'self-organizing-list', 'unrolled-linked-list']:
+        assert 'linked-lists' in topics[id]['prerequisites']
+    resources = api.get('/api/dsa/resources', params={'topic': 'linked-lists'}).json()
+    assert {resource['id'] for resource in resources['items']} == {'opendsa-linked', 'opendsa-doubly'}
